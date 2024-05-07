@@ -216,8 +216,9 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                               );
                             },
                           ),
-                          child: Text('Open Dialog'),
+                          child: Text('Répartion'),
                         ),
+                        SizedBox(height: 10,) ,
                         ElevatedButton(
                           onPressed: () {
                             showDialog(
@@ -274,7 +275,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                               },
                             );
                           },
-                          child: Text('Open Dialog'),
+                          child: Text('Liste des voeux'),
                         ),
 
 
