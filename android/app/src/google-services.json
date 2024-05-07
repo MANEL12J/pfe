@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "278555224342",
+    "project_id": "matierelink-4a87d",
+    "storage_bucket": "matierelink-4a87d.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:278555224342:android:7bb75cb90359111c18c837",
+        "android_client_info": {
+          "package_name": "com.example.untitled4"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDIq6vCXdJ1V3tMIW2HgalIlm-hvuwWUVQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
