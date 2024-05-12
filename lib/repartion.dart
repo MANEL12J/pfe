@@ -141,6 +141,18 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       }
     }
   }
+  final TextEditingController _messageController = TextEditingController();
+
+  void _sendMessage() {
+    if (_messageController.text.isNotEmpty) {
+      FirebaseFirestore.instance.collection('messages').add({
+        'text': _messageController.text,
+        'createdAt': Timestamp.now(),
+        'userId': idnavigateur,
+      });
+      _messageController.clear();
+    }
+  }
 
 
 
@@ -195,87 +207,165 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                   //PREMIER TAB
                   Container(
                     child:
-                    Column(
+                    Row(
                       children: [
-                        ElevatedButton(
-                          onPressed: () => showDialog(
-                            context: context,
-                            builder: (context) {
-                              return Dialog(
-                                child: StatefulBuilder(
-                                  builder: (BuildContext context, StateSetter setState) {
-                                    return Container(
-                                      width: MediaQuery.of(context).size.width * 0.9,
-                                      height: MediaQuery.of(context).size.height * 0.9,
-                                      child: SingleChildScrollView(
-                                        child: premierTabContent(setState: setState),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                          child: Text('Répartion'),
-                        ),
-                        SizedBox(height: 10,) ,
-                        ElevatedButton(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return StatefulBuilder(  // Utilisez StatefulBuilder ici
-                                  builder: (BuildContext context, StateSetter setState) {  // Notez le `setState` ici
-                                    return Dialog(
-                                      child: Container(
-                                        width: MediaQuery.of(context).size.width * 0.9,
-                                        height: MediaQuery.of(context).size.height * 0.9,
-                                        child: Card(
-                                          margin: EdgeInsets.all(20),
-                                          child: StreamBuilder<QuerySnapshot>(
-                                            stream: FirebaseFirestore.instance.collection('users').orderBy('timestamp', descending: true).snapshots(),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.hasError) return Text('Error: ${snapshot.error}');
-                                              switch (snapshot.connectionState) {
-                                                case ConnectionState.waiting:
-                                                  return Center(child: CircularProgressIndicator());
-                                                default:
-                                                  List<Map<String, dynamic>> users = snapshot.data!.docs
-                                                      .map((DocumentSnapshot document) {
-                                                    return document.data() as Map<String, dynamic>;
-                                                  })
-                                                      .toList();
-
-                                                  return Row(
-                                                    children: [
-                                                      Expanded(
-                                                        flex: 3,
-                                                        child: buildUsersTable(users, context, onSelectUser: (String userId) {
-                                                          setState(() {  // Utilisez le setState local de StatefulBuilder
-                                                            selectedUserId2 = userId;
-                                                          });
-                                                        }),
-                                                      ),
-                                                      Expanded(
-                                                        flex: 3,
-                                                        child: selectedUserId2 == null
-                                                            ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
-                                                            : userDetails(selectedUserId2),
-                                                      ),
-                                                    ],
-                                                  );
-                                              }
-                                            },
+                        Row(
+                          children: [
+                            ElevatedButton(
+                              onPressed: () => showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return Dialog(
+                                    child: StatefulBuilder(
+                                      builder: (BuildContext context, StateSetter setState) {
+                                        return Container(
+                                          width: MediaQuery.of(context).size.width * 0.9,
+                                          height: MediaQuery.of(context).size.height * 0.9,
+                                          child: SingleChildScrollView(
+                                            child: premierTabContent(setState: setState),
                                           ),
-                                        ),
-                                      ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                              child: Text('Répartion'),
+                            ),
+                            SizedBox(width: 10,) ,
+                            ElevatedButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return StatefulBuilder(  // Utilisez StatefulBuilder ici
+                                      builder: (BuildContext context, StateSetter setState) {  // Notez le `setState` ici
+                                        return Dialog(
+                                          child: Container(
+                                            width: MediaQuery.of(context).size.width * 0.9,
+                                            height: MediaQuery.of(context).size.height * 0.9,
+                                            child: Card(
+                                              margin: EdgeInsets.all(20),
+                                              child: StreamBuilder<QuerySnapshot>(
+                                                stream: FirebaseFirestore.instance.collection('users').orderBy('timestamp', descending: true).snapshots(),
+                                                builder: (context, snapshot) {
+                                                  if (snapshot.hasError) return Text('Error: ${snapshot.error}');
+                                                  switch (snapshot.connectionState) {
+                                                    case ConnectionState.waiting:
+                                                      return Center(child: CircularProgressIndicator());
+                                                    default:
+                                                      List<Map<String, dynamic>> users = snapshot.data!.docs
+                                                          .map((DocumentSnapshot document) {
+                                                        return document.data() as Map<String, dynamic>;
+                                                      })
+                                                          .toList();
+
+                                                      return Row(
+                                                        children: [
+                                                          Expanded(
+                                                            flex: 3,
+                                                            child: buildUsersTable(users, context, onSelectUser: (String userId) {
+                                                              setState(() {  // Utilisez le setState local de StatefulBuilder
+                                                                selectedUserId2 = userId;
+                                                              });
+                                                            }),
+                                                          ),
+                                                          Expanded(
+                                                            flex: 3,
+                                                            child: selectedUserId2 == null
+                                                                ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
+                                                                : userDetails(selectedUserId2),
+                                                          ),
+                                                        ],
+                                                      );
+                                                  }
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     );
                                   },
                                 );
                               },
-                            );
-                          },
-                          child: Text('Liste des voeux'),
+                              child: Text('Liste des voeux'),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            Expanded(
+                              child: StreamBuilder(
+                                stream: FirebaseFirestore.instance
+                                    .collection('messages')
+                                    .orderBy('createdAt', descending: true)
+                                    .snapshots(),
+                                builder: (ctx, AsyncSnapshot<QuerySnapshot> chatSnapshot) {
+                                  if (chatSnapshot.connectionState == ConnectionState.waiting) {
+                                    return Center(child: CircularProgressIndicator());
+                                  }
+                                  final chatDocs = chatSnapshot.data!.docs;
+                                  return ListView.builder(
+                                    reverse: true,
+                                    itemCount: chatDocs.length,
+                                    itemBuilder: (ctx, index) {
+                                      var isMe = chatDocs[index]['userId'] == idnavigateur;
+                                      return ListTile(
+                                        leading: isMe ? null : CircleAvatar(child: Icon(Icons.person)),
+                                        title: Container(
+                                          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                          decoration: BoxDecoration(
+                                            color: isMe ? Colors.grey[300] : Colors.blue[400],
+                                            borderRadius: isMe
+                                                ? BorderRadius.only(
+                                              topLeft: Radius.circular(12),
+                                              topRight: Radius.circular(12),
+                                              bottomLeft: Radius.circular(12),
+                                            )
+                                                : BorderRadius.only(
+                                              topLeft: Radius.circular(12),
+                                              topRight: Radius.circular(12),
+                                              bottomRight: Radius.circular(12),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            chatDocs[index]['text'],
+                                            style: TextStyle(color: isMe ? Colors.black : Colors.white),
+                                          ),
+                                        ),
+                                        trailing: isMe ? CircleAvatar(child: Icon(Icons.person)) : null,
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Row(
+                                children: <Widget>[
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _messageController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Send a message...',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  IconButton(
+                                    icon: Icon(Icons.send, color: Colors.blueGrey),
+                                    onPressed: _sendMessage,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
 
 

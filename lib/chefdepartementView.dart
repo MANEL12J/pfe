@@ -6,17 +6,16 @@ import 'package:timeline_tile/timeline_tile.dart';
 import 'main.dart';
 
 class chefdepartementView extends StatefulWidget {
-  chefdepartementView({Key? key, this.title = "Boite de réception"}) : super(key: key);
-
-  final String title;
-
+  String idchefdepartement;
+  chefdepartementView({Key? key, required this.idchefdepartement}) : super(key: key);
   @override
-  _chefdepartementView createState() => _chefdepartementView();
+  _chefdepartementView createState() => _chefdepartementView(idchefdepartement);
 }
 
 class _chefdepartementView extends State<chefdepartementView> with TickerProviderStateMixin {
   // Pagination state
-
+  String idchefdepartement;
+  _chefdepartementView(this.idchefdepartement);
 
   Color primary = const Color(0xffEFEDF5);
   late TabController _tabController;
@@ -180,7 +179,18 @@ class _chefdepartementView extends State<chefdepartementView> with TickerProvide
       });
     }
   }
+  final TextEditingController _messageController = TextEditingController();
 
+  void _sendMessage() {
+    if (_messageController.text.isNotEmpty) {
+      FirebaseFirestore.instance.collection('messages').add({
+        'text': _messageController.text,
+        'createdAt': Timestamp.now(),
+        'userId': idchefdepartement,
+      });
+      _messageController.clear();
+    }
+  }
 
 
 
@@ -220,7 +230,7 @@ class _chefdepartementView extends State<chefdepartementView> with TickerProvide
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 5,
-        title: Text(widget.title, style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+        title: Text('Chef departement', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -327,7 +337,80 @@ class _chefdepartementView extends State<chefdepartementView> with TickerProvide
                           )
                       )),],
                   ),
-                  Container(color: Colors.grey[300], child: Center(child: Text("No data"))),
+                  Column(
+                    children: [
+                      Expanded(
+                        child: StreamBuilder(
+                          stream: FirebaseFirestore.instance
+                              .collection('messages')
+                              .orderBy('createdAt', descending: true)
+                              .snapshots(),
+                          builder: (ctx, AsyncSnapshot<QuerySnapshot> chatSnapshot) {
+                            if (chatSnapshot.connectionState == ConnectionState.waiting) {
+                              return Center(child: CircularProgressIndicator());
+                            }
+                            final chatDocs = chatSnapshot.data!.docs;
+                            return ListView.builder(
+                              reverse: true,
+                              itemCount: chatDocs.length,
+                              itemBuilder: (ctx, index) {
+                                var isMe = chatDocs[index]['userId'] == idchefdepartement;
+                                return ListTile(
+                                  leading: isMe ? null : CircleAvatar(child: Icon(Icons.person)),
+                                  title: Container(
+                                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                    margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: isMe ? Colors.grey[300] : Colors.blue[400],
+                                      borderRadius: isMe
+                                          ? BorderRadius.only(
+                                        topLeft: Radius.circular(12),
+                                        topRight: Radius.circular(12),
+                                        bottomLeft: Radius.circular(12),
+                                      )
+                                          : BorderRadius.only(
+                                        topLeft: Radius.circular(12),
+                                        topRight: Radius.circular(12),
+                                        bottomRight: Radius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      chatDocs[index]['text'],
+                                      style: TextStyle(color: isMe ? Colors.black : Colors.white),
+                                    ),
+                                  ),
+                                  trailing: isMe ? CircleAvatar(child: Icon(Icons.person)) : null,
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                decoration: InputDecoration(
+                                  labelText: 'Send a message...',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            IconButton(
+                              icon: Icon(Icons.send, color: Colors.blueGrey),
+                              onPressed: _sendMessage,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                   Column(
                     children: [
                       Padding(
@@ -535,7 +618,6 @@ class _chefdepartementView extends State<chefdepartementView> with TickerProvide
       ),
     );
   }
-
   Widget buildUsersTable(List<Map<String, dynamic>> users) {
     if (users.isEmpty) {
       return Center(child: Text("Pas d'enseignants trouvé"));
@@ -595,7 +677,6 @@ class _chefdepartementView extends State<chefdepartementView> with TickerProvide
       ],
     );
   }
-
   Widget statusWidget(String? status) {
     switch (status) {
       case "rien":
@@ -663,7 +744,7 @@ class _navigation2 extends State<navigation2> {
   Color primary = const Color(0xff89B5A2);
   late List<Widget> scr ;
   _navigation2(this.idnavigateur) {
-    scr = [      chefdepartementView() , chefdepartementView()  ];
+    scr = [      chefdepartementView(idchefdepartement: "chef",) , chefdepartementView(idchefdepartement: "chef",)  ];
   }
   final labelstyle = const TextStyle(fontWeight: FontWeight.bold , fontSize: 20);
   Color card = const Color(0xFFF9F9F9);
