@@ -4,28 +4,26 @@ import 'package:untitled4/main.dart';
 import 'package:intl/intl.dart';
 
 class MainUserweb extends StatefulWidget {
-  String iduserweb ;
-  MainUserweb({Key? key, required this.iduserweb }) : super(key: key);
-
+  String iduserweb;
+  MainUserweb({Key? key, required this.iduserweb}) : super(key: key);
 
   @override
   _MainUserweb createState() => _MainUserweb(iduserweb);
 }
 
 class _MainUserweb extends State<MainUserweb> {
-  String iduserweb ;
+  String iduserweb;
   _MainUserweb(this.iduserweb);
-
 
   String profName = "";
   String? valeur;
   String? datefin;
 
-  void initState(){
+  void initState() {
     super.initState();
     fetchProfName();
-
   }
+
   Future<dynamic> fetchProfName() async {
     DocumentSnapshot profDoc = await FirebaseFirestore.instance
         .collection('users')
@@ -38,7 +36,6 @@ class _MainUserweb extends State<MainUserweb> {
       setState(() {
         profName = data['displayName'] ?? 'Name not found';
         valeur = data['valide'] ?? 'non valide';
-
       });
     } else {
       setState(() {
@@ -47,7 +44,8 @@ class _MainUserweb extends State<MainUserweb> {
     }
     FirebaseFirestore db = FirebaseFirestore.instance;
     try {
-      QuerySnapshot querySnapshot = await db.collection('dates')
+      QuerySnapshot querySnapshot = await db
+          .collection('dates')
           .orderBy('timestamp', descending: true)
           .limit(1)
           .get();
@@ -58,31 +56,34 @@ class _MainUserweb extends State<MainUserweb> {
         String formattedDate = DateFormat('yyyy-MM-dd').format(date);
         setState(() {
           datefin = formattedDate;
-        });// Formate la date en String selon le format désiré
+        }); // Formate la date en String selon le format désiré
       } else {
         setState(() {
           datefin = "Aucune date disponible";
-        });  // Gestion quand aucun document n'est trouvé
+        }); // Gestion quand aucun document n'est trouvé
       }
     } catch (e) {
       setState(() {
         datefin = "Erreur lors de la récupération";
       });
-
-
     }
   }
-  List<ModuleState> moduleStates = List.generate(3, (index) => ModuleState(
-    moduleController: TextEditingController(),
-    parcoursController: TextEditingController(),
-  ));
-  List<ModuleState> moduleStates2 = List.generate(3, (index) => ModuleState(
-    moduleController: TextEditingController(),
-    parcoursController: TextEditingController(),
-  ));
+
+  List<ModuleState> moduleStates = List.generate(
+      3,
+      (index) => ModuleState(
+            moduleController: TextEditingController(),
+            parcoursController: TextEditingController(),
+          ));
+  List<ModuleState> moduleStates2 = List.generate(
+      3,
+      (index) => ModuleState(
+            moduleController: TextEditingController(),
+            parcoursController: TextEditingController(),
+          ));
 
   void _showGradeDialog(BuildContext context) {
-    String? selectedGrade = "Chef de département";  // Default initial value
+    String? selectedGrade = "Chef de département"; // Default initial value
 
     List<String> grades = [
       "Chef de département",
@@ -112,13 +113,14 @@ class _MainUserweb extends State<MainUserweb> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10.0),
               ),
-              fillColor: Colors.grey[800],  // Slightly lighter grey than the background
+              fillColor:
+                  Colors.grey[800], // Slightly lighter grey than the background
               filled: true,
               prefixIcon: const Icon(Icons.school, color: Colors.white),
             ),
-            dropdownColor: Colors.grey[800],  // Dropdown background
+            dropdownColor: Colors.grey[800], // Dropdown background
             value: selectedGrade,
-            style: const TextStyle(color: Colors.white),  // Text style for items
+            style: const TextStyle(color: Colors.white), // Text style for items
             onChanged: (String? newValue) {
               if (newValue != null) {
                 selectedGrade = newValue;
@@ -134,7 +136,8 @@ class _MainUserweb extends State<MainUserweb> {
           actions: <Widget>[
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                primary: Colors.green,  // A vibrant color to contrast the dark background
+                primary: Colors
+                    .green, // A vibrant color to contrast the dark background
                 onPrimary: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10.0),
@@ -143,14 +146,15 @@ class _MainUserweb extends State<MainUserweb> {
               child: const Text("Enregistrer"),
               onPressed: () {
                 if (selectedGrade != null) {
-                  FirebaseFirestore.instance.collection('users').doc(iduserweb).update(
-                      {'grade': selectedGrade}
-                  ).then((_) {
+                  FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(iduserweb)
+                      .update({'grade': selectedGrade}).then((_) {
                     Navigator.of(context).pop();
                   }).catchError((error) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Erreur lors de l'enregistrement: $error"))
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content:
+                            Text("Erreur lors de l'enregistrement: $error")));
                   });
                 }
               },
@@ -160,6 +164,7 @@ class _MainUserweb extends State<MainUserweb> {
       },
     );
   }
+
   Future<void> saveData(String userId) async {
     List<Map<String, dynamic>> modules = moduleStates.map((ModuleState state) {
       return {
@@ -172,7 +177,8 @@ class _MainUserweb extends State<MainUserweb> {
     }).toList();
     var db = FirebaseFirestore.instance;
     var userDocRef = db.collection("users").doc(userId);
-    var ficheDeVoeuxRef = userDocRef.collection("fiche de voeux").doc("semetre1");
+    var ficheDeVoeuxRef =
+        userDocRef.collection("fiche de voeux").doc("semetre1");
 
     await ficheDeVoeuxRef.set({
       "department": "Informatique",
@@ -185,8 +191,10 @@ class _MainUserweb extends State<MainUserweb> {
       "valide": "true",
     });
   }
+
   Future<void> saveData2(String userId) async {
-    List<Map<String, dynamic>> modules = moduleStates2.map((ModuleState state2) {
+    List<Map<String, dynamic>> modules =
+        moduleStates2.map((ModuleState state2) {
       return {
         "moduleName": state2.moduleController.text,
         "parcours": state2.parcoursController.text,
@@ -197,7 +205,8 @@ class _MainUserweb extends State<MainUserweb> {
     }).toList();
     var db = FirebaseFirestore.instance;
     var userDocRef = db.collection("users").doc(userId);
-    var ficheDeVoeuxRef = userDocRef.collection("fiche de voeux").doc("semetre2");
+    var ficheDeVoeuxRef =
+        userDocRef.collection("fiche de voeux").doc("semetre2");
 
     await ficheDeVoeuxRef.set({
       "department": "Informatique",
@@ -210,9 +219,6 @@ class _MainUserweb extends State<MainUserweb> {
       "valide": "true",
     });
   }
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -228,22 +234,29 @@ class _MainUserweb extends State<MainUserweb> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(profName.toLowerCase(), style: TextStyle(
-              fontSize: 17,
-              color: Colors.white,
-              fontWeight: FontWeight.bold
-            ),),
+            Text(
+              profName.toLowerCase(),
+              style: TextStyle(
+                  fontSize: 17,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold),
+            ),
             StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').doc(iduserweb).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(iduserweb)
+                  .snapshots(),
               builder: (context, snapshot) {
-
-                if (!snapshot.hasData) return const Text(''); // Show loading text if no data
+                if (!snapshot.hasData)
+                  return const Text(''); // Show loading text if no data
 
                 var userDoc = snapshot.data;
-                var grade = userDoc?['grade'] ?? "rien"; // Default to "rien" if grade is not set
+                var grade = userDoc?['grade'] ??
+                    "rien"; // Default to "rien" if grade is not set
 
                 return Visibility(
-                  visible: grade == "rien", // Visibility based on grade being "rien"
+                  visible:
+                      grade == "rien", // Visibility based on grade being "rien"
                   child: Center(
                     child: IconButton(
                       icon: const Icon(Icons.notification_important),
@@ -256,19 +269,19 @@ class _MainUserweb extends State<MainUserweb> {
                 );
               },
             ),
-
-
           ],
         ),
       ),
-
       body: Container(
         margin: const EdgeInsets.all(6),
         child: Center(
           child: Column(
             children: <Widget>[
               StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(iduserweb).snapshots(),
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(iduserweb)
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Text('Error: ${snapshot.error}');
@@ -279,13 +292,15 @@ class _MainUserweb extends State<MainUserweb> {
                   }
 
                   var userDoc = snapshot.data;
-                  var valeur = userDoc?['valide'] ?? 'null'; // Defaulting to 'null' if the key does not exist
+                  var valeur = userDoc?['valide'] ??
+                      'null'; // Defaulting to 'null' if the key does not exist
 
                   if (valeur == 'null') {
-                    return  Align(
+                    return Align(
                       alignment: Alignment.topLeft,
                       child: Padding(
-                        padding: const EdgeInsets.all(8.0), // Add some padding around the text
+                        padding: const EdgeInsets.all(
+                            8.0), // Add some padding around the text
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
@@ -293,27 +308,25 @@ class _MainUserweb extends State<MainUserweb> {
                             Text(
                               'Boîte de réception',
                               style: TextStyle(
-                                  fontSize: 22, // Slightly larger text for the title
+                                  fontSize:
+                                      22, // Slightly larger text for the title
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87
-                              ),
+                                  color: Colors.black87),
                             ),
                             const Divider(),
-                            SizedBox(height: 10), // Space between the title and subtitle
+                            SizedBox(
+                                height:
+                                    10), // Space between the title and subtitle
                             Text(
                               "Aucun message pour l'instant !",
                               style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600
-                              ),
+                                  fontSize: 18, color: Colors.grey.shade600),
                             ),
                           ],
                         ),
                       ),
                     );
-
-                  }
-                  else if (valeur == 'false') {
+                  } else if (valeur == 'false') {
                     return Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -321,14 +334,24 @@ class _MainUserweb extends State<MainUserweb> {
                           Text(
                             'Fiche de vœux $currentYear /$nextYear',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold,),),
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           Text(
                             '(Veuiller soumettre avant $datefin)',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold,),),
-                          const SizedBox(height: 15,),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(
+                            height: 15,
+                          ),
                           Expanded(
-                            flex:   1,
+                            flex: 1,
                             child: ListView(
                               physics: const NeverScrollableScrollPhysics(),
                               children: [
@@ -337,12 +360,19 @@ class _MainUserweb extends State<MainUserweb> {
                                     Expanded(
                                       flex: 3,
                                       child: Container(
-                                          margin: const EdgeInsets.only(left: 8),
+                                          margin:
+                                              const EdgeInsets.only(left: 8),
                                           decoration: const BoxDecoration(
                                             border: Border(
-                                              top: BorderSide(color: Colors.blueGrey, width: 2),
-                                              left: BorderSide(color: Colors.blueGrey, width: 2),
-                                              right: BorderSide(color: Colors.blueGrey, width: 2),
+                                              top: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              left: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              right: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
                                             ),
                                           ),
                                           child: Padding(
@@ -350,37 +380,57 @@ class _MainUserweb extends State<MainUserweb> {
                                             child: RichText(
                                               textAlign: TextAlign.left,
                                               text: TextSpan(
-                                                style: const TextStyle( color: Colors.black), // Style par défaut pour tout le texte
+                                                style: const TextStyle(
+                                                    color: Colors
+                                                        .black), // Style par défaut pour tout le texte
                                                 children: [
                                                   const TextSpan(
                                                     text: 'MATIÈRES ',
-                                                    style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
                                                     text: ' À POUVOIR',
-                                                    style: TextStyle(color: Colors.red,fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
                                                     text: ' SOUHAITÉES POUR LE',
-                                                    style: TextStyle(fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
                                                     text: '  SEMESTRE 1 ',
-                                                    style: TextStyle(color: Colors.red,fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   TextSpan(
-                                                    text: '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold,),
+                                                    text:
+                                                        '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
-                                                    text: '(Préciser le parcours L1, L2, L3, M1, M2)',
-
+                                                    text:
+                                                        '(Préciser le parcours L1, L2, L3, M1, M2)',
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                          )
-                                      ),
+                                          )),
                                     ),
                                     Expanded(
                                       flex: 1,
@@ -388,13 +438,18 @@ class _MainUserweb extends State<MainUserweb> {
                                         margin: const EdgeInsets.only(right: 8),
                                         decoration: const BoxDecoration(
                                           border: Border(
-                                            top: BorderSide(color: Colors.blueGrey, width: 2),
-                                            right: BorderSide(color: Colors.blueGrey, width: 2),
+                                            top: BorderSide(
+                                                color: Colors.blueGrey,
+                                                width: 2),
+                                            right: BorderSide(
+                                                color: Colors.blueGrey,
+                                                width: 2),
                                           ),
                                         ),
                                         child: const Text(
                                           'Département \n',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
                                           textAlign: TextAlign.center,
                                         ),
                                       ),
@@ -402,7 +457,8 @@ class _MainUserweb extends State<MainUserweb> {
                                   ],
                                 ),
                                 Card(
-                                  margin: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 8.0),
+                                  margin: const EdgeInsets.fromLTRB(
+                                      8.0, 0, 8.0, 8.0),
                                   color: Colors.white,
                                   elevation: 0.0,
                                   child: Table(
@@ -414,66 +470,89 @@ class _MainUserweb extends State<MainUserweb> {
                                       4: FlexColumnWidth(0.5),
                                       5: FlexColumnWidth(2),
                                     },
-                                    border: TableBorder.all(color: Colors.blueGrey, width: 2),
+                                    border: TableBorder.all(
+                                        color: Colors.blueGrey, width: 2),
                                     children: [
                                       const TableRow(children: [
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('Modules', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold )),
+                                          child: Text('Modules',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('Parcours', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('Parcours',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('Cours', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('Cours',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('TD', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('TD',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('TP', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('TP',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                       ]),
-                                      ...List.generate(moduleStates.length, (index) {
+                                      ...List.generate(moduleStates.length,
+                                          (index) {
                                         final state = moduleStates[index];
                                         return TableRow(children: [
-
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: Center(
                                               child: TextField(
-                                                controller: state.moduleController,
+                                                controller:
+                                                    state.moduleController,
                                                 decoration: InputDecoration(
                                                   isDense: true,
-                                                  contentPadding: const EdgeInsets.all(10),
-                                                  hintText:'${index + 1}:' ,
-                                                  border: const OutlineInputBorder(),
-
+                                                  contentPadding:
+                                                      const EdgeInsets.all(10),
+                                                  hintText: '${index + 1}:',
+                                                  border:
+                                                      const OutlineInputBorder(),
                                                 ),
                                               ),
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: TextField(
-                                              controller: state.parcoursController,
+                                              controller:
+                                                  state.parcoursController,
                                               decoration: const InputDecoration(
                                                 isDense: true,
-                                                contentPadding: EdgeInsets.all(10),
+                                                contentPadding:
+                                                    EdgeInsets.all(10),
                                                 border: OutlineInputBorder(),
                                               ),
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: Center(
                                               child: Checkbox(
                                                 value: state.course,
@@ -487,7 +566,7 @@ class _MainUserweb extends State<MainUserweb> {
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: Center(
                                               child: Checkbox(
                                                 value: state.td,
@@ -501,23 +580,26 @@ class _MainUserweb extends State<MainUserweb> {
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
-                                            child: Center(child: Checkbox(
-                                              value: state.tp,
-                                              onChanged: (bool? value) {
-                                                setState(() {
-                                                  state.tp = value!;
-                                                });
-                                              },
-                                              activeColor: Colors.green,
-                                            ),),
+                                            height: 30,
+                                            child: Center(
+                                              child: Checkbox(
+                                                value: state.tp,
+                                                onChanged: (bool? value) {
+                                                  setState(() {
+                                                    state.tp = value!;
+                                                  });
+                                                },
+                                                activeColor: Colors.green,
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: TextField(
                                               decoration: InputDecoration(
                                                 isDense: true,
-                                                contentPadding: EdgeInsets.all(10),
+                                                contentPadding:
+                                                    EdgeInsets.all(10),
                                                 border: OutlineInputBorder(),
                                               ),
                                             ),
@@ -529,24 +611,33 @@ class _MainUserweb extends State<MainUserweb> {
                                 ),
                               ],
                             ),
-
                           ),
-                          const SizedBox(height: 10,),
+                          const SizedBox(
+                            height: 10,
+                          ),
                           Expanded(
-                            flex:   1,
-                            child: ListView(physics: const NeverScrollableScrollPhysics(),
+                            flex: 1,
+                            child: ListView(
+                              physics: const NeverScrollableScrollPhysics(),
                               children: [
                                 Row(
                                   children: [
                                     Expanded(
                                       flex: 3,
                                       child: Container(
-                                          margin: const EdgeInsets.only(left: 8 ),
+                                          margin:
+                                              const EdgeInsets.only(left: 8),
                                           decoration: const BoxDecoration(
                                             border: Border(
-                                              top: BorderSide(color: Colors.blueGrey, width: 2),
-                                              left: BorderSide(color: Colors.blueGrey, width: 2),
-                                              right: BorderSide(color: Colors.blueGrey, width: 2),
+                                              top: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              left: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              right: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
                                             ),
                                           ),
                                           child: Padding(
@@ -554,38 +645,57 @@ class _MainUserweb extends State<MainUserweb> {
                                             child: RichText(
                                               textAlign: TextAlign.left,
                                               text: TextSpan(
-                                                style: const TextStyle( color: Colors.black), // Style par défaut pour tout le texte
+                                                style: const TextStyle(
+                                                    color: Colors
+                                                        .black), // Style par défaut pour tout le texte
                                                 children: [
                                                   const TextSpan(
                                                     text: 'MATIÈRES ',
-                                                    style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
                                                     text: ' À POUVOIR',
-                                                    style: TextStyle(color: Colors.red,fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
                                                     text: ' SOUHAITÉES POUR LE',
-                                                    style: TextStyle(fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
                                                     text: '  SEMESTRE 2 ',
-                                                    style: TextStyle(color: Colors.red,fontWeight: FontWeight.bold,),
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   TextSpan(
-                                                    text: '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold,),
+                                                    text:
+                                                        '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                   const TextSpan(
-                                                    text: '(Préciser le parcours L1, L2, L3, M1, M2)',
-
+                                                    text:
+                                                        '(Préciser le parcours L1, L2, L3, M1, M2)',
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                          )
-
-                                      ),
+                                          )),
                                     ),
                                     Expanded(
                                       flex: 1,
@@ -593,13 +703,18 @@ class _MainUserweb extends State<MainUserweb> {
                                         margin: const EdgeInsets.only(right: 8),
                                         decoration: const BoxDecoration(
                                           border: Border(
-                                            top: BorderSide(color: Colors.blueGrey, width: 2),
-                                            right: BorderSide(color: Colors.blueGrey, width: 2),
+                                            top: BorderSide(
+                                                color: Colors.blueGrey,
+                                                width: 2),
+                                            right: BorderSide(
+                                                color: Colors.blueGrey,
+                                                width: 2),
                                           ),
                                         ),
                                         child: const Text(
                                           'Département \n',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
                                           textAlign: TextAlign.center,
                                         ),
                                       ),
@@ -607,7 +722,8 @@ class _MainUserweb extends State<MainUserweb> {
                                   ],
                                 ),
                                 Card(
-                                  margin: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 8.0),
+                                  margin: const EdgeInsets.fromLTRB(
+                                      8.0, 0, 8.0, 8.0),
                                   color: Colors.white,
                                   elevation: 0.0,
                                   child: Table(
@@ -619,62 +735,87 @@ class _MainUserweb extends State<MainUserweb> {
                                       4: FlexColumnWidth(0.5),
                                       5: FlexColumnWidth(2),
                                     },
-                                    border: TableBorder.all(color: Colors.blueGrey, width: 2),
+                                    border: TableBorder.all(
+                                        color: Colors.blueGrey, width: 2),
                                     children: [
                                       const TableRow(children: [
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('Modules', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('Modules',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('Parcours', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('Parcours',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('Cours', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('Cours',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('TD', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('TD',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('TP', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('TP',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                         Padding(
                                           padding: EdgeInsets.all(8.0),
-                                          child: Text('', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+                                          child: Text('',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                       ]),
-                                      ...List.generate(moduleStates2.length, (index) {
+                                      ...List.generate(moduleStates2.length,
+                                          (index) {
                                         final state2 = moduleStates2[index];
                                         return TableRow(children: [
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: TextField(
-                                              controller : state2.moduleController,
+                                              controller:
+                                                  state2.moduleController,
                                               decoration: InputDecoration(
                                                 isDense: true,
-                                                contentPadding: const EdgeInsets.all(10),
-                                                hintText:'${index + 1}:' ,
-                                                border: const OutlineInputBorder(),
+                                                contentPadding:
+                                                    const EdgeInsets.all(10),
+                                                hintText: '${index + 1}:',
+                                                border:
+                                                    const OutlineInputBorder(),
                                               ),
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: TextField(
-                                              controller : state2.parcoursController,
+                                              controller:
+                                                  state2.parcoursController,
                                               decoration: const InputDecoration(
                                                 isDense: true,
-                                                contentPadding: EdgeInsets.all(10),
+                                                contentPadding:
+                                                    EdgeInsets.all(10),
                                                 border: OutlineInputBorder(),
                                               ),
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: Center(
                                               child: Checkbox(
                                                 value: state2.course,
@@ -688,7 +829,7 @@ class _MainUserweb extends State<MainUserweb> {
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: Center(
                                               child: Checkbox(
                                                 value: state2.td,
@@ -702,23 +843,26 @@ class _MainUserweb extends State<MainUserweb> {
                                             ),
                                           ),
                                           SizedBox(
-                                            height : 30,
-                                            child: Center(child: Checkbox(
-                                              value: state2.tp,
-                                              onChanged: (bool? value) {
-                                                setState(() {
-                                                  state2.tp = value!;
-                                                });
-                                              },
-                                              activeColor: Colors.green,
-                                            ),),
+                                            height: 30,
+                                            child: Center(
+                                              child: Checkbox(
+                                                value: state2.tp,
+                                                onChanged: (bool? value) {
+                                                  setState(() {
+                                                    state2.tp = value!;
+                                                  });
+                                                },
+                                                activeColor: Colors.green,
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(
-                                            height : 30,
+                                            height: 30,
                                             child: TextField(
                                               decoration: InputDecoration(
                                                 isDense: true,
-                                                contentPadding: EdgeInsets.all(10),
+                                                contentPadding:
+                                                    EdgeInsets.all(10),
                                                 border: OutlineInputBorder(),
                                               ),
                                             ),
@@ -727,53 +871,65 @@ class _MainUserweb extends State<MainUserweb> {
                                       }),
                                     ],
                                   ),
-                                ),],),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 10,),
+                          const SizedBox(
+                            height: 10,
+                          ),
                           Padding(
                             padding: const EdgeInsets.all(8.0),
                             child: Align(
                               alignment: Alignment.bottomRight,
                               child: SizedBox(
                                 height: 40,
-                                width:  100,
+                                width: 100,
                                 child: MaterialButton(
                                   onPressed: () async {
-                                    FirebaseFirestore db = FirebaseFirestore.instance;
-                                    var docRef = db.collection('users').doc(iduserweb);
+                                    FirebaseFirestore db =
+                                        FirebaseFirestore.instance;
+                                    var docRef =
+                                        db.collection('users').doc(iduserweb);
                                     await docRef.update({
-                                      'valide': 'true'  // Met à jour le champ `valide` à true
-                                    }).catchError((error) {
-
-                                    });
+                                      'valide':
+                                          'true' // Met à jour le champ `valide` à true
+                                    }).catchError((error) {});
                                     await saveData(iduserweb);
                                     await saveData2(iduserweb);
                                   },
-                                  color: Colors.green,  // Couleur du bouton
-                                  textColor: Colors.white,  // Couleur du texte
+                                  color: Colors.green, // Couleur du bouton
+                                  textColor: Colors.white, // Couleur du texte
                                   child: const Row(
-                                    mainAxisSize: MainAxisSize.min,  // Pour s'assurer que le contenu interne reste compact
+                                    mainAxisSize: MainAxisSize
+                                        .min, // Pour s'assurer que le contenu interne reste compact
                                     children: <Widget>[
-                                      Icon(Icons.check),  // Icône
-                                      SizedBox(width: 8),  // Espace entre l'icône et le texte
-                                      Text('Valider'),  // Texte
+                                      Icon(Icons.check), // Icône
+                                      SizedBox(
+                                          width:
+                                              8), // Espace entre l'icône et le texte
+                                      Text('Valider'), // Texte
                                     ],
                                   ),
                                   shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(5.0)  // Arrondir les coins du bouton
-                                  ),
-                                  elevation: 2.0,  // Ajoute une ombre sous le bouton
+                                      borderRadius: BorderRadius.circular(
+                                          5.0) // Arrondir les coins du bouton
+                                      ),
+                                  elevation:
+                                      2.0, // Ajoute une ombre sous le bouton
                                 ),
                               ),
                             ),
-                          ),],),
+                          ),
+                        ],
+                      ),
                     );
-                  }
-                  else if (valeur == 'true') {
-                    return  Align(
+                  } else if (valeur == 'true') {
+                    return Align(
                       alignment: Alignment.topLeft,
                       child: Padding(
-                        padding: const EdgeInsets.all(8.0), // Add some padding around the text
+                        padding: const EdgeInsets.all(
+                            8.0), // Add some padding around the text
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
@@ -781,19 +937,19 @@ class _MainUserweb extends State<MainUserweb> {
                             Text(
                               'Boîte de réception',
                               style: TextStyle(
-                                  fontSize: 22, // Slightly larger text for the title
+                                  fontSize:
+                                      22, // Slightly larger text for the title
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87
-                              ),
+                                  color: Colors.black87),
                             ),
                             const Divider(),
-                            SizedBox(height: 10), // Space between the title and subtitle
+                            SizedBox(
+                                height:
+                                    10), // Space between the title and subtitle
                             Text(
                               "Merci, la répartition vous sera transmise",
                               style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600
-                              ),
+                                  fontSize: 18, color: Colors.grey.shade600),
                             ),
                           ],
                         ),
@@ -804,13 +960,10 @@ class _MainUserweb extends State<MainUserweb> {
                   }
                 },
               )
-
-
             ],
           ),
         ),
       ),
-
     );
   }
 }
@@ -833,13 +986,11 @@ class ModuleState {
   });
 
   Map<String, dynamic> toJson() => {
-    'moduleName': moduleController.text,
-    'parcours': parcoursController.text,
-    'course': course,
-    'td': td,
-    'tp': tp,
-    'additionalInfo': additionalInfo,
-  };
+        'moduleName': moduleController.text,
+        'parcours': parcoursController.text,
+        'course': course,
+        'td': td,
+        'tp': tp,
+        'additionalInfo': additionalInfo,
+      };
 }
-
-

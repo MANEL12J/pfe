@@ -27,6 +27,7 @@ class _navigationState extends State<navigation> {
       selectedindex = index;
     });
   }
+
   Future<void> signOut() async {
     final GoogleSignIn googleSignIn = GoogleSignIn();
 
@@ -40,11 +41,9 @@ class _navigationState extends State<navigation> {
       // Update shared preferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setBool('auth', false);
-
-    } catch (error) {
-
-    }
+    } catch (error) {}
   }
+
   Widget _getDrawerItemWidget(int pos) {
     switch (pos) {
       case 0:
@@ -63,21 +62,29 @@ class _navigationState extends State<navigation> {
     required Function() onTap,
   }) {
     return Container(
-      decoration: isSelected ? BoxDecoration(
-          color: Colors.white, // Background color for selected item
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20))
-      ) : null,
+      decoration: isSelected
+          ? BoxDecoration(
+              color: Colors.white, // Background color for selected item
+              borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  bottomLeft: Radius.circular(20)))
+          : null,
       child: ListTile(
         title: Text(
           title,
-          style: TextStyle(color: isSelected ? Colors.black87 : Colors.white , fontSize: 13),
+          style: TextStyle(
+              color: isSelected ? Colors.black87 : Colors.white, fontSize: 13),
         ),
-        leading: Icon(icon, color: isSelected ? Colors.black87 : Colors.white ,size: 14),
+        leading: Icon(icon,
+            color: isSelected ? Colors.black87 : Colors.white, size: 14),
         selected: isSelected,
         onTap: onTap,
-        shape: isSelected ? RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20))
-        ) : null,
+        shape: isSelected
+            ? RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    bottomLeft: Radius.circular(20)))
+            : null,
       ),
     );
   }
@@ -85,7 +92,8 @@ class _navigationState extends State<navigation> {
   @override
   Widget build(BuildContext context) {
     var drawer = Container(
-      width: MediaQuery.of(context).size.width * 0.14, // Adjust the width as needed
+      width: MediaQuery.of(context).size.width *
+          0.14, // Adjust the width as needed
       color: Colors.black87,
       child: Column(
         children: <Widget>[
@@ -94,7 +102,8 @@ class _navigationState extends State<navigation> {
               padding: EdgeInsets.only(left: 8),
               children: <Widget>[
                 DrawerHeader(
-                  child: Image.asset("assets/logoozaki-removebg-preview.png", width: 70, height: 70, fit: BoxFit.contain),
+                  child: Image.asset("assets/logoozaki-removebg-preview.png",
+                      width: 70, height: 70, fit: BoxFit.contain),
                 ),
                 _buildDrawerItem(
                   title: 'Boite de réception',
@@ -119,14 +128,16 @@ class _navigationState extends State<navigation> {
               onPressed: () async {
                 await signOut();
                 // Optionally navigate to the login screen after signing out
-                Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => MyApp()));
+                Navigator.pushReplacement(
+                    context, MaterialPageRoute(builder: (context) => MyApp()));
               },
               elevation: 3,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min, // Use MainAxisSize.min to wrap content within the button
+                mainAxisSize: MainAxisSize
+                    .min, // Use MainAxisSize.min to wrap content within the button
                 children: const <Widget>[
                   Icon(Icons.logout, color: Colors.white, size: 14),
                   SizedBox(width: 8),

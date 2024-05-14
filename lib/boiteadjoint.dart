@@ -10,8 +10,6 @@ class adjointboite extends StatefulWidget {
 }
 
 class _adjointboite extends State<adjointboite> {
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -21,8 +19,7 @@ class _adjointboite extends State<adjointboite> {
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-          ],
+          children: <Widget>[],
         ),
       ),
       // This trailing comma makes auto-formatting nicer for build methods.

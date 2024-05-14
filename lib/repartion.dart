@@ -1,11 +1,14 @@
+import 'package:badges/badges.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'main.dart';
+import 'package:badges/badges.dart' as badges;
+import 'package:syncfusion_flutter_charts/charts.dart'; // Alias for the external badges package
+
 
 class AdjointRep extends StatefulWidget {
   String idnavigateur;
-  AdjointRep({Key? key, required this.idnavigateur }) : super(key: key);
+  AdjointRep({Key? key, required this.idnavigateur}) : super(key: key);
   @override
   _AdjointRep createState() => _AdjointRep(idnavigateur);
 }
@@ -25,9 +28,11 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
   late TabController _tabController;
   int _selectedTabIndex = 0;
   List<Map<String, dynamic>> filteredUsers = [];
-  Future<List<Map<String, dynamic>>> getUsersByParcoursAndSemester(String parcours, String semester) async {
+  Future<List<Map<String, dynamic>>> getUsersByParcoursAndSemester(
+      String parcours, String semester) async {
     List<Map<String, dynamic>> usersData = [];
-    var usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
+    var usersSnapshot =
+        await FirebaseFirestore.instance.collection('users').get();
 
     for (var user in usersSnapshot.docs) {
       // Get additional user info such as displayName and grade
@@ -35,7 +40,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       var grade = user.data()['grade'] ?? "No grade";
 
       // Navigate into the specific semester collection in 'fiche de voeux'
-      var ficheSnapshot = await user.reference.collection('fiche de voeux').doc(semester).get();
+      var ficheSnapshot =
+          await user.reference.collection('fiche de voeux').doc(semester).get();
       if (ficheSnapshot.exists) {
         var modules = ficheSnapshot.data()?['modules'] as List;
         for (var module in modules) {
@@ -56,9 +62,16 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     }
     return usersData;
   }
+
   String abbreviate(String text) {
     List<String> words = text.split(' '); // Sépare le texte en mots.
-    List<String> ignoreWords = ['de', 'la', 'le', 'les', 'des']; // Mots à ignorer
+    List<String> ignoreWords = [
+      'de',
+      'la',
+      'le',
+      'les',
+      'des'
+    ]; // Mots à ignorer
     String abbreviation = '';
 
     // Cas spécifique pour des mots complets comme "Professeur"
@@ -69,14 +82,17 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     for (int i = 0; i < words.length; i++) {
       String word = words[i];
       if (word.isNotEmpty && !ignoreWords.contains(word.toLowerCase())) {
-        if (word.length == 1) { // Pour des mots comme 'A' dans "Maître Assistant A"
+        if (word.length == 1) {
+          // Pour des mots comme 'A' dans "Maître Assistant A"
           abbreviation += word;
         } else {
           // Ajouter la première lettre du premier mot en majuscule, le reste en minuscule
           if (i == 0) {
-            abbreviation += word[0].toUpperCase(); // La première lettre du premier mot en majuscule
+            abbreviation += word[0]
+                .toUpperCase(); // La première lettre du premier mot en majuscule
           } else {
-            abbreviation += word[0].toLowerCase(); // La première lettre des autres mots en minuscule
+            abbreviation += word[0]
+                .toLowerCase(); // La première lettre des autres mots en minuscule
           }
         }
       }
@@ -84,30 +100,25 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     return abbreviation; // Retourne le résultat avec la première lettre en majuscule et le reste en minuscule
   }
 
-
-
-
-
-
   @override
   void initState() {
     super.initState();
-
+    _fetchChartData();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       setState(() {
-        _selectedTabIndex = _tabController.index; // Update the selected tab index
+        _selectedTabIndex =
+            _tabController.index; // Update the selected tab index
       });
-
     });
   }
-
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
+
   String? selectedUserId;
   String? selectedUserId2;
   void selectUser(String userId) {
@@ -115,23 +126,29 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       selectedUserId = userId;
     });
   }
+
   String searchText = '';
-  void _valider(StateSetter updateState, String selectedParcours, String selectedSemestre, TextEditingController groupeController) async {
-    if (selectedParcours.isNotEmpty && selectedSemestre.isNotEmpty && groupeController.text.isNotEmpty) {
+  void _valider(StateSetter updateState, String selectedParcours,
+      String selectedSemestre, TextEditingController groupeController) async {
+    if (selectedParcours.isNotEmpty &&
+        selectedSemestre.isNotEmpty &&
+        groupeController.text.isNotEmpty) {
       int? nombreGroupes = int.tryParse(groupeController.text);
       if (nombreGroupes != null) {
         // Détermination du semestre correct
-        String semestre = selectedSemestre == "Semestre 1" ? "semetre1" : "semetre2";
+        String semestre =
+            selectedSemestre == "Semestre 1" ? "semetre1" : "semetre2";
 
         // Récupération des utilisateurs correspondant au parcours et au semestre
-        List<Map<String, dynamic>> users = await getUsersByParcoursAndSemester(selectedParcours, semestre);
+        List<Map<String, dynamic>> users =
+            await getUsersByParcoursAndSemester(selectedParcours, semestre);
 
         // Mise à jour de l'interface utilisateur dans le dialogue
         updateState(() {
           filteredUsers = users;
-          customTable = _buildCustomTable(selectedParcours, selectedSemestre, nombreGroupes);
+          customTable = _buildCustomTable(
+              selectedParcours, selectedSemestre, nombreGroupes);
         });
-
       } else {
         // Réinitialisation de l'interface utilisateur en cas d'erreur
         updateState(() {
@@ -141,36 +158,115 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       }
     }
   }
+
   final TextEditingController _messageController = TextEditingController();
 
-  void _sendMessage() {
-    if (_messageController.text.isNotEmpty) {
+  void _sendMessage(String message, String userId) {
+    if (message.isNotEmpty) {
       FirebaseFirestore.instance.collection('messages').add({
-        'text': _messageController.text,
+        'text': message,
         'createdAt': Timestamp.now(),
-        'userId': idnavigateur,
+        'userId': userId,
+        'isRead': false,
       });
       _messageController.clear();
     }
   }
 
+  void markMessagesAsRead(String senderId) {
+    FirebaseFirestore.instance
+        .collection('messages')
+        .where('userId', isEqualTo: senderId)
+        .where('isRead', isEqualTo: false)
+        .get()
+        .then((snapshot) {
+      for (var doc in snapshot.docs) {
+        doc.reference.update({'isRead': true});
+      }
+    });
+  }
+  List<StatusData> _chartData = [];
+  Future<void> _fetchChartData() async {
+    QuerySnapshot querySnapshot = await FirebaseFirestore.instance.collection('users').get();
+    Map<String, int> statusCounts = {
+      'valider': 0,
+      'en attente': 0,
+    };
 
+    for (var doc in querySnapshot.docs) {
+      String status = doc['statu'];
+      if (statusCounts.containsKey(status)) {
+        statusCounts[status] = statusCounts[status]! + 1;
+      }
+    }
+
+    List<StatusData> pieData = statusCounts.entries.map((entry) {
+      return StatusData(entry.key, entry.value);
+    }).toList();
+
+    setState(() {
+      _chartData = pieData;
+    });
+  }
+  Color blue = Color(0xff0036FE);
+  Color red  = Color(0xffDD6DF1);
+  Color Green = Color(0xff1BD0A3);
+  Color orange = Color(0xffFD6803);
 
   @override
   Widget build(BuildContext context) {
+    List<Color> chartColors = [
+      blue,
+      red,
+      Green,
+      orange,
+    ];
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        // Increase the AppBar's height
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.black87,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text("AdjointView" , style: TextStyle(color: Colors.white, fontSize: 23),),
-          ],
-        ),
+
+      floatingActionButton:
+      StreamBuilder(
+        stream: FirebaseFirestore.instance
+            .collection('messages')
+            .where('userId', isEqualTo: "chef") // Assuming 'idChief' is the chief's user ID
+            .where('isRead', isEqualTo: false)
+            .snapshots(),
+        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+          int unreadMessages = snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+          return badges.Badge(
+            badgeContent: Text(
+              unreadMessages.toString(),
+              style: TextStyle(color: Colors.white),
+            ),
+            showBadge: unreadMessages > 0,
+            badgeColor: Colors.red,
+            position: BadgePosition.topEnd(top: 3, end: 3),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20.0), // Adjust the radius as needed
+              child: FloatingActionButton(
+                elevation: 0,
+                highlightElevation: 0,
+                onPressed: () {
+                  markMessagesAsRead('chef'); // Mark the messages as read when the dialog is opened
+                  showDialog(
+                    context: context,
+                    builder: (context) => buildChatDialog(context),
+                  );
+                },
+                child: Icon(Icons.message),
+                backgroundColor: Colors.blue,
+              ),
+            ),
+          );
+        },
       ),
+
+
+
+
+
+
       body: Column(
         children: [
           Padding(
@@ -185,7 +281,10 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 controller: _tabController,
                 indicatorColor: Colors.blueAccent,
                 indicatorWeight: 5.0,
-                labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue),
+                labelStyle: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue),
                 unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal),
                 labelColor: Colors.black,
                 labelPadding: const EdgeInsets.only(left: 30, right: 30),
@@ -194,7 +293,6 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                   Tab(text: "Répartition"),
                   Tab(text: "Liste fiches des voeux"),
                   Tab(text: "Boite de Réception"),
-
                 ],
               ),
             ),
@@ -205,172 +303,120 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 physics: NeverScrollableScrollPhysics(),
                 children: [
                   //PREMIER TAB
-                  Container(
-                    child:
-                    Row(
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
                       children: [
-                        Row(
-                          children: [
-                            ElevatedButton(
-                              onPressed: () => showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return Dialog(
-                                    child: StatefulBuilder(
-                                      builder: (BuildContext context, StateSetter setState) {
-                                        return Container(
-                                          width: MediaQuery.of(context).size.width * 0.9,
-                                          height: MediaQuery.of(context).size.height * 0.9,
-                                          child: SingleChildScrollView(
-                                            child: premierTabContent(setState: setState),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  );
-                                },
-                              ),
-                              child: Text('Répartion'),
-                            ),
-                            SizedBox(width: 10,) ,
-                            ElevatedButton(
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return StatefulBuilder(  // Utilisez StatefulBuilder ici
-                                      builder: (BuildContext context, StateSetter setState) {  // Notez le `setState` ici
-                                        return Dialog(
-                                          child: Container(
-                                            width: MediaQuery.of(context).size.width * 0.9,
-                                            height: MediaQuery.of(context).size.height * 0.9,
-                                            child: Card(
-                                              margin: EdgeInsets.all(20),
-                                              child: StreamBuilder<QuerySnapshot>(
-                                                stream: FirebaseFirestore.instance.collection('users').orderBy('timestamp', descending: true).snapshots(),
-                                                builder: (context, snapshot) {
-                                                  if (snapshot.hasError) return Text('Error: ${snapshot.error}');
-                                                  switch (snapshot.connectionState) {
-                                                    case ConnectionState.waiting:
-                                                      return Center(child: CircularProgressIndicator());
-                                                    default:
-                                                      List<Map<String, dynamic>> users = snapshot.data!.docs
-                                                          .map((DocumentSnapshot document) {
-                                                        return document.data() as Map<String, dynamic>;
-                                                      })
-                                                          .toList();
-
-                                                      return Row(
-                                                        children: [
-                                                          Expanded(
-                                                            flex: 3,
-                                                            child: buildUsersTable(users, context, onSelectUser: (String userId) {
-                                                              setState(() {  // Utilisez le setState local de StatefulBuilder
-                                                                selectedUserId2 = userId;
-                                                              });
-                                                            }),
-                                                          ),
-                                                          Expanded(
-                                                            flex: 3,
-                                                            child: selectedUserId2 == null
-                                                                ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
-                                                                : userDetails(selectedUserId2),
-                                                          ),
-                                                        ],
-                                                      );
-                                                  }
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => showDialog(
+                              context: context,
+                              builder: (context) {
+                                return Dialog(
+                                  child: StatefulBuilder(
+                                    builder: (BuildContext context, StateSetter setState) {
+                                      return Container(
+                                        width: MediaQuery.of(context).size.width * 0.9,
+                                        height: MediaQuery.of(context).size.height * 0.9,
+                                        child: SingleChildScrollView(
+                                          child: premierTabContent(setState: setState),
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 );
                               },
-                              child: Text('Liste des voeux'),
                             ),
-                          ],
+                            child: Text('Répartion'),
+                          ),
                         ),
-                        Column(
-                          children: [
-                            Expanded(
-                              child: StreamBuilder(
-                                stream: FirebaseFirestore.instance
-                                    .collection('messages')
-                                    .orderBy('createdAt', descending: true)
-                                    .snapshots(),
-                                builder: (ctx, AsyncSnapshot<QuerySnapshot> chatSnapshot) {
-                                  if (chatSnapshot.connectionState == ConnectionState.waiting) {
-                                    return Center(child: CircularProgressIndicator());
-                                  }
-                                  final chatDocs = chatSnapshot.data!.docs;
-                                  return ListView.builder(
-                                    reverse: true,
-                                    itemCount: chatDocs.length,
-                                    itemBuilder: (ctx, index) {
-                                      var isMe = chatDocs[index]['userId'] == idnavigateur;
-                                      return ListTile(
-                                        leading: isMe ? null : CircleAvatar(child: Icon(Icons.person)),
-                                        title: Container(
-                                          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                                          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                          decoration: BoxDecoration(
-                                            color: isMe ? Colors.grey[300] : Colors.blue[400],
-                                            borderRadius: isMe
-                                                ? BorderRadius.only(
-                                              topLeft: Radius.circular(12),
-                                              topRight: Radius.circular(12),
-                                              bottomLeft: Radius.circular(12),
-                                            )
-                                                : BorderRadius.only(
-                                              topLeft: Radius.circular(12),
-                                              topRight: Radius.circular(12),
-                                              bottomRight: Radius.circular(12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return StatefulBuilder(
+                                    builder: (BuildContext context, StateSetter setState) {
+                                      return Dialog(
+                                        child: Container(
+                                          width: MediaQuery.of(context).size.width * 0.9,
+                                          height: MediaQuery.of(context).size.height * 0.9,
+                                          child: Card(
+                                            margin: EdgeInsets.all(20),
+                                            child: StreamBuilder<QuerySnapshot>(
+                                              stream: FirebaseFirestore.instance
+                                                  .collection('users')
+                                                  .orderBy('timestamp', descending: true)
+                                                  .snapshots(),
+                                              builder: (context, snapshot) {
+                                                if (snapshot.hasError) return Text('Error: ${snapshot.error}');
+                                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                                  return Center(child: CircularProgressIndicator());
+                                                }
+                                                List<Map<String, dynamic>> users = snapshot.data!.docs.map((DocumentSnapshot document) {
+                                                  return document.data() as Map<String, dynamic>;
+                                                }).toList();
+
+                                                return Row(
+                                                  children: [
+                                                    Expanded(
+                                                      flex: 3,
+                                                      child: buildUsersTable(users, context, onSelectUser: (String userId) {
+                                                        setState(() {
+                                                          selectedUserId2 = userId;
+                                                        });
+                                                      }),
+                                                    ),
+                                                    Expanded(
+                                                      flex: 3,
+                                                      child: selectedUserId2 == null
+                                                          ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
+                                                          : userDetails(selectedUserId2!),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
                                             ),
                                           ),
-                                          child: Text(
-                                            chatDocs[index]['text'],
-                                            style: TextStyle(color: isMe ? Colors.black : Colors.white),
-                                          ),
                                         ),
-                                        trailing: isMe ? CircleAvatar(child: Icon(Icons.person)) : null,
                                       );
                                     },
                                   );
                                 },
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Row(
-                                children: <Widget>[
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _messageController,
-                                      decoration: InputDecoration(
-                                        labelText: 'Send a message...',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  IconButton(
-                                    icon: Icon(Icons.send, color: Colors.blueGrey),
-                                    onPressed: _sendMessage,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                              );
+                            },
+                            child: Text('Liste des voeux'),
+                          ),
                         ),
-
-
-
-
+                        Expanded(
+                          child: SfCircularChart(
+                            title: ChartTitle(text: 'Visualisation des listes des voeux'),
+                            legend: Legend(
+                              isVisible: true,
+                              overflowMode: LegendItemOverflowMode.wrap,
+                            ),
+                            series: <CircularSeries>[
+                              DoughnutSeries<StatusData, String>(
+                                dataSource: _chartData,
+                                xValueMapper: (StatusData data, _) => data.status,
+                                yValueMapper: (StatusData data, _) => data.count,
+                                dataLabelMapper: (StatusData data, _) => '${data.status}: ${data.count}',
+                                dataLabelSettings: DataLabelSettings(isVisible: true),
+                                pointColorMapper: (StatusData data, _) {
+                                  switch (data.status) {
+                                    case 'valider':
+                                      return  Green;
+                                    case 'en attente':
+                                      return orange;
+                                    default:
+                                      return Colors.grey;
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -379,10 +425,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                     child: deuxiemeTabContent(),
                   ),
                   //TROISIEME TAB
-                 Container(),
-
-
-
+                  Container(),
                 ]),
           ),
         ],
@@ -390,15 +433,187 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     );
   }
 
+  Widget buildChatDialog(BuildContext context) {
+    double width = MediaQuery.of(context).size.width * 0.4; // Wider dialog for better readability
+    double height = MediaQuery.of(context).size.height * 0.99; // Adjust height to match
 
-  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context, {required Function(String) onSelectUser}) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), // Rounded corners for the dialog
+      child: StatefulBuilder(
+        builder: (BuildContext context, StateSetter setState) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20), // Rounded corners for the container
+            ),
+            width: width,
+            height: height,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header area
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: Colors.blue, // Header background color
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Text(
+                    "Discussion",
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // Message list
+                Expanded(
+                  child: buildMessageList(context, width),
+                ),
+                // Input field
+                buildInputField(context, _messageController, width),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+  Widget buildInputField(BuildContext context, TextEditingController messageController, double width) {
+    // Implement your input field for messages here
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: messageController,
+              decoration: InputDecoration(
+                hintText: "Type a message...",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey[200],
+              ),
+
+            ),
+          ),
+          IconButton(
+            splashColor: Colors.transparent, // Remove splash effect on button press
+            highlightColor: Colors.transparent,
+            icon: Icon(Icons.send, color: Colors.blue),
+            onPressed: () => _sendMessage(messageController.text, idnavigateur),
+
+          ),
+
+        ],
+      ),
+    );
+  }
+  Widget buildMessageList(BuildContext context, double width) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('messages')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (ctx, AsyncSnapshot<QuerySnapshot> chatSnapshot) {
+        if (chatSnapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        if (!chatSnapshot.hasData) {
+          return Center(child: Text("No messages found"));
+        }
+        final chatDocs = chatSnapshot.data!.docs;
+
+        return ListView.builder(
+          reverse: true,
+          itemCount: chatDocs.length,
+          itemBuilder: (ctx, index) {
+            var message = chatDocs[index];
+            var isMe = message['userId'] == idnavigateur; // Compare message userId with current user's ID
+            var messageTime = message['createdAt'] as Timestamp;
+            var formattedTime = DateFormat('HH:mm').format(messageTime.toDate());
+
+            return Row(
+              mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              children: [
+                if (!isMe) Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: CircleAvatar(
+                    // You can display the sender's initials or an icon
+                    child: Text(message['userId'].substring(0, 1).toUpperCase()), // Display first letter of userId
+                  ),
+                ),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: width * 0.7, // Maximum width for a message bubble
+                  ),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                    margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: isMe ? Colors.grey[100] : Colors.blue[300], // Different colors for sender/receiver
+                      borderRadius: isMe
+                          ? BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                        bottomLeft: Radius.circular(12),
+                      )
+                          : BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          message['text'], // The message text
+                          style: TextStyle(color: Colors.black),
+                          softWrap: true,
+                        ),
+                        SizedBox(height: 5),
+                        Text(
+                          formattedTime, // The formatted timestamp
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context,
+      {required Function(String) onSelectUser}) {
     if (users.isEmpty) {
       return Center(child: Text("Pas d'enseignants trouvé"));
     }
 
     // Assuming that all documents have the same keys
-    List<String> headers = users.first.keys.where((key) => key != "timestamp" && key != "uid" && key != "valide" && key != "email").toList();
-    headers.sort((a, b) => a.compareTo(b));  // Sort headers alphabetically
+    List<String> headers = users.first.keys
+        .where((key) =>
+            key != "timestamp" &&
+            key != "uid" &&
+            key != "valide" &&
+            key != "email")
+        .toList();
+    headers.sort((a, b) => a.compareTo(b)); // Sort headers alphabetically
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -410,15 +625,19 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: headers.map((header) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Text(
-                    header,
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ),
-              )).toList(),
+              children: headers
+                  .map((header) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: Text(
+                            header,
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                          ),
+                        ),
+                      ))
+                  .toList(),
             ),
           ),
         ),
@@ -431,9 +650,11 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
             itemBuilder: (context, index) {
               Map<String, dynamic> user = users[index];
               return InkWell(
-                onTap: () => onSelectUser(user['uid']),  // Trigger the onSelectUser callback
+                onTap: () => onSelectUser(
+                    user['uid']), // Trigger the onSelectUser callback
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 10.0, horizontal: 16.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: headers.map((header) {
@@ -454,7 +675,6 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     );
   }
 
-
   Widget statusWidget(String? status) {
     switch (status) {
       case "rien":
@@ -467,7 +687,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
             color: Colors.grey,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Center(child: Text("En attente", style: TextStyle(color: Colors.white))),
+          child: Center(
+              child: Text("En attente", style: TextStyle(color: Colors.white))),
         );
       case "valider":
         return Container(
@@ -477,7 +698,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
             color: Colors.green,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Center(child: Text("Validé", style: TextStyle(color: Colors.white))),
+          child: Center(
+              child: Text("Validé", style: TextStyle(color: Colors.white))),
         );
       case "refuser":
         return Container(
@@ -487,7 +709,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
             color: Colors.red,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Center(child: Text("Refusé", style: TextStyle(color: Colors.white))),
+          child: Center(
+              child: Text("Refusé", style: TextStyle(color: Colors.white))),
         );
       default:
         return Container(); // Default case to handle unexpected status
@@ -513,13 +736,14 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       child: child,
     );
   }
+
   Widget userSearchResults() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('users').snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red));
+        if (snapshot.hasError)
+          return Text('Error: ${snapshot.error}',
+              style: TextStyle(color: Colors.red));
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         }
@@ -535,21 +759,27 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: Colors.blue, width: 1.0),  // Only bottom border
+                    bottom: BorderSide(
+                        color: Colors.blue, width: 1.0), // Only bottom border
                   ),
                 ),
                 child: ListTile(
                   title: Text(
                     documents[index]['displayName'],
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),  // Smaller font size
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12), // Smaller font size
                   ),
                   subtitle: Text(
                     "Grade: ${documents[index]['grade']}",
-                    style: TextStyle(fontSize: 10),  // Smaller font size for subtitle
+                    style: TextStyle(
+                        fontSize: 10), // Smaller font size for subtitle
                   ),
-                  trailing: Icon(Icons.arrow_forward_ios, size: 14),  // Smaller icon
+                  trailing:
+                      Icon(Icons.arrow_forward_ios, size: 14), // Smaller icon
                   onTap: () => selectUser(documents[index]['uid']),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),  // Reduced padding
+                  contentPadding: EdgeInsets.symmetric(
+                      horizontal: 8.0, vertical: 4.0), // Reduced padding
                 ),
               ),
             );
@@ -558,6 +788,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       },
     );
   }
+
   Widget userDetails(String? userId) {
     if (userId == null) {
       return Center(child: Text("", style: TextStyle(fontSize: 14)));
@@ -565,7 +796,9 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
 
     return Column(
       children: [
-        Center(child: Text('Fiche de voeux', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22))),
+        Center(
+            child: Text('Fiche de voeux',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22))),
         Expanded(
           child: semesterDetails(userId, 'semetre1'),
         ),
@@ -575,6 +808,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       ],
     );
   }
+
   Widget semesterDetails(String? userId, String semester) {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -584,7 +818,9 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
           .doc(semester)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Text('Erreur de chargement', style: TextStyle(color: Colors.red, fontSize: 14));
+        if (snapshot.hasError)
+          return Text('Erreur de chargement',
+              style: TextStyle(color: Colors.red, fontSize: 14));
         if (!snapshot.hasData || snapshot.data?.data() == null) {
           return Center(child: CircularProgressIndicator());
         }
@@ -597,22 +833,25 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$semester', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Text('$semester',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               SizedBox(height: 4),
               Expanded(
                 child: GridView.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 1,  // Single column for a table-like layout
-                    childAspectRatio: MediaQuery.of(context).size.width / 70,  // Adjust childAspectRatio based on screen width to fix height
+                    crossAxisCount: 1, // Single column for a table-like layout
+                    childAspectRatio: MediaQuery.of(context).size.width /
+                        70, // Adjust childAspectRatio based on screen width to fix height
                   ),
                   itemCount: modules.length,
                   itemBuilder: (context, index) {
                     Map<String, dynamic> module = modules[index];
                     return Container(
-                      height: 30,  // Fixed height for each row
+                      height: 30, // Fixed height for each row
                       decoration: BoxDecoration(
                         border: Border(
-                          bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                          bottom:
+                              BorderSide(color: Colors.grey[300]!, width: 1),
                           top: BorderSide(color: Colors.grey[300]!, width: 1),
                           left: BorderSide(color: Colors.grey[300]!, width: 1),
                           right: BorderSide(color: Colors.grey[300]!, width: 1),
@@ -623,20 +862,29 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Expanded(
-                              flex: 3, // Allocates 3 parts of space for the module name, more space due to potential length
-                              child: Text("Module: ${module['moduleName']}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              flex:
+                                  3, // Allocates 3 parts of space for the module name, more space due to potential length
+                              child: Text("Module: ${module['moduleName']}",
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15)),
                             ),
                             Expanded(
-                              child: Text("Parcours: ${module['parcours']}", style: TextStyle(fontSize: 13)),
+                              child: Text("Parcours: ${module['parcours']}",
+                                  style: TextStyle(fontSize: 13)),
                             ),
                             Expanded(
-                              child: Text("Course: ${module['course'] ? 'Yes' : 'No'}", style: TextStyle(fontSize: 13)),
+                              child: Text(
+                                  "Course: ${module['course'] ? 'Yes' : 'No'}",
+                                  style: TextStyle(fontSize: 13)),
                             ),
                             Expanded(
-                              child: Text("TD: ${module['td'] ? 'Yes' : 'No'}", style: TextStyle(fontSize: 13)),
+                              child: Text("TD: ${module['td'] ? 'Yes' : 'No'}",
+                                  style: TextStyle(fontSize: 13)),
                             ),
                             Expanded(
-                              child: Text("TP: ${module['tp'] ? 'Yes' : 'No'}", style: TextStyle(fontSize: 13)),
+                              child: Text("TP: ${module['tp'] ? 'Yes' : 'No'}",
+                                  style: TextStyle(fontSize: 13)),
                             ),
                           ],
                         ),
@@ -648,15 +896,15 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
             ],
           ),
         );
-
       },
     );
   }
-  Widget deuxiemeTabContent(){
-    return  Row(
+
+  Widget deuxiemeTabContent() {
+    return Row(
       children: <Widget>[
         Expanded(
-          flex:1 ,  // Adjusted for better spacing
+          flex: 1, // Adjusted for better spacing
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
@@ -670,7 +918,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                     ),
                   ),
                   Expanded(
-                    child: Padding( // Padding added here
+                    child: Padding(
+                      // Padding added here
                       padding: EdgeInsets.only(top: 10.0), // Top padding only
                       child: TextField(
                         onChanged: (value) {
@@ -682,36 +931,54 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                           labelText: 'Entrer le nom',
                           prefixIcon: Icon(Icons.search),
                           floatingLabelBehavior: FloatingLabelBehavior.never,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 0), // No vertical padding inside the TextField
-                          border: OutlineInputBorder( // Changed to OutlineInputBorder for clearer visibility
-                            borderRadius: BorderRadius.circular(8.0), // More pronounced rounded corners
-                            borderSide: BorderSide(color: Colors.grey, width: 1.0), // Visible grey border
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 10.0,
+                              vertical:
+                                  0), // No vertical padding inside the TextField
+                          border: OutlineInputBorder(
+                            // Changed to OutlineInputBorder for clearer visibility
+                            borderRadius: BorderRadius.circular(
+                                8.0), // More pronounced rounded corners
+                            borderSide: BorderSide(
+                                color: Colors.grey,
+                                width: 1.0), // Visible grey border
                           ),
-                          focusedBorder: OutlineInputBorder( // Border style when the TextField is focused
+                          focusedBorder: OutlineInputBorder(
+                            // Border style when the TextField is focused
                             borderRadius: BorderRadius.circular(8.0),
-                            borderSide: BorderSide(color: Colors.grey, width: 2.0), // Thicker blue border
+                            borderSide: BorderSide(
+                                color: Colors.grey,
+                                width: 2.0), // Thicker blue border
                           ),
-                          enabledBorder: OutlineInputBorder( // Border style when the TextField is enabled but not focused
+                          enabledBorder: OutlineInputBorder(
+                            // Border style when the TextField is enabled but not focused
                             borderRadius: BorderRadius.circular(8.0),
-                            borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                            borderSide:
+                                BorderSide(color: Colors.grey, width: 1.0),
                           ),
                         ),
                       ),
                     ),
-                  ),],),
-                  Expanded(
-                        child: userSearchResults(),
-                   ),
-             ],
+                  ),
+                ],
+              ),
+              Expanded(
+                child: userSearchResults(),
+              ),
+            ],
           ),
         ),
-        SizedBox(width: 100,),
+        SizedBox(
+          width: 100,
+        ),
         Expanded(
           flex: 2, // Adjusted for better spacing
           child: userDetails(selectedUserId),
-        ),],
+        ),
+      ],
     );
   }
+
   Widget premierTabContent({required void Function(void Function()) setState}) {
     return SingleChildScrollView(
       child: Column(
@@ -734,7 +1001,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                             selectedParcours = newValue;
                           });
                         },
-                        items: parcours.map<DropdownMenuItem<String>>((String value) {
+                        items: parcours
+                            .map<DropdownMenuItem<String>>((String value) {
                           return DropdownMenuItem<String>(
                             value: value,
                             child: Text(value),
@@ -758,7 +1026,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                             selectedSemestre = newValue;
                           });
                         },
-                        items: semestres.map<DropdownMenuItem<String>>((String value) {
+                        items: semestres
+                            .map<DropdownMenuItem<String>>((String value) {
                           return DropdownMenuItem<String>(
                             value: value,
                             child: Text(value),
@@ -790,13 +1059,15 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 SizedBox(width: 10),
                 // Button to validate the input
                 ElevatedButton(
-                  onPressed:  (){
-                    _valider(setState, selectedParcours!, selectedSemestre!, groupeController);
+                  onPressed: () {
+                    _valider(setState, selectedParcours!, selectedSemestre!,
+                        groupeController);
                   },
                   style: ElevatedButton.styleFrom(
                     primary: Colors.blueAccent, // Button color
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12), // Rounded corners
+                      borderRadius:
+                          BorderRadius.circular(12), // Rounded corners
                     ),
                   ),
                   child: Text(
@@ -825,7 +1096,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                       child: Align(
                         alignment: Alignment.topLeft,
                         child: Expanded(
-                          child: customTable!, // Assurez-vous que customTable est capable de gérer l'overflow.
+                          child:
+                              customTable!, // Assurez-vous que customTable est capable de gérer l'overflow.
                         ),
                       ),
                     ),
@@ -854,43 +1126,46 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                         ),
                         Expanded(
                             child: ListView.builder(
-                              itemCount: filteredUsers.length,
-                              itemBuilder: (BuildContext context, int index) {
-                                var user = filteredUsers[index];
-                                return Card(
-                                  elevation: 2,
-                                  margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                  child: ListTile(
-                                    title: Row(
-                                      children: [
-                                        Expanded(
-                                            child: Text(
-                                              user['displayName'],
-                                              overflow: TextOverflow.ellipsis, // Ajoute des points de suspension si nécessaire
-                                              maxLines: 1, // Garde le texte sur une seule ligne
-                                            )
-                                        ),
-                                        Expanded(
-                                            child: Text(
-                                              abbreviate(user['grade']),
-                                              overflow: TextOverflow.ellipsis, // Ajoute des points de suspension si nécessaire
-                                              maxLines: 1, // Garde le texte sur une seule ligne
-                                            )
-                                        )
-                                      ],
-                                    ),
-                                    subtitle: Text(
-                                      "Module: ${user['moduleName']}",
-                                      style: TextStyle(fontWeight: FontWeight.bold),
-                                      overflow: TextOverflow.ellipsis, // Gère le texte long dans le sous-titre
-                                      maxLines: 1, // Garde le sous-titre sur une seule ligne
-                                    ),
-                                  ),
-                                );
-                              },
-                            )
-
-                        ),
+                          itemCount: filteredUsers.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            var user = filteredUsers[index];
+                            return Card(
+                              elevation: 2,
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 4, horizontal: 8),
+                              child: ListTile(
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                        child: Text(
+                                      user['displayName'],
+                                      overflow: TextOverflow
+                                          .ellipsis, // Ajoute des points de suspension si nécessaire
+                                      maxLines:
+                                          1, // Garde le texte sur une seule ligne
+                                    )),
+                                    Expanded(
+                                        child: Text(
+                                      abbreviate(user['grade']),
+                                      overflow: TextOverflow
+                                          .ellipsis, // Ajoute des points de suspension si nécessaire
+                                      maxLines:
+                                          1, // Garde le texte sur une seule ligne
+                                    ))
+                                  ],
+                                ),
+                                subtitle: Text(
+                                  "Module: ${user['moduleName']}",
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow
+                                      .ellipsis, // Gère le texte long dans le sous-titre
+                                  maxLines:
+                                      1, // Garde le sous-titre sur une seule ligne
+                                ),
+                              ),
+                            );
+                          },
+                        )),
                       ],
                     ),
                   ),
@@ -902,7 +1177,9 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       ),
     );
   }
-  Widget _buildCustomTable(String selectedParcours, String selectedSemestre, int numberOfGroups) {
+
+  Widget _buildCustomTable(
+      String selectedParcours, String selectedSemestre, int numberOfGroups) {
     _updateCourses(selectedParcours, selectedSemestre);
     List<Widget> rows = [
       Divider(),
@@ -931,6 +1208,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       ),
     );
   }
+
   Widget _buildEmptyRowWithLabel() {
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -941,27 +1219,33 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
         child: Row(
           children: [
             Expanded(
-              child: Text('Cours', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold,fontSize: 10)),
+              child: Text('Cours',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
             ),
-            ...List.generate(courses.length, (index) => Expanded(
-              child: TextField(
-                style: TextStyle(fontSize: 10),
-                decoration: InputDecoration(
-                  hintText: '',
-                  hintStyle: TextStyle(fontSize: 10),
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(vertical: 8.0),
-                  constraints: BoxConstraints(
-                    maxHeight: 30, // Hauteur maximale du TextField réduite
-                  ),
-                ),
-              ),
-            )),
+            ...List.generate(
+                courses.length,
+                (index) => Expanded(
+                      child: TextField(
+                        style: TextStyle(fontSize: 10),
+                        decoration: InputDecoration(
+                          hintText: '',
+                          hintStyle: TextStyle(fontSize: 10),
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                30, // Hauteur maximale du TextField réduite
+                          ),
+                        ),
+                      ),
+                    )),
           ],
         ),
       ),
     );
   }
+
   Widget _buildCoursesHeader() {
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -973,16 +1257,24 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
         child: Row(
           children: [
             Expanded(
-              child: Text('MODULES', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('MODULES',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-            ...courses.map((course) => Expanded(
-              child: Text(course, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            )).toList(),
+            ...courses
+                .map((course) => Expanded(
+                      child: Text(course,
+                          style: TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center),
+                    ))
+                .toList(),
           ],
         ),
       ),
     );
   }
+
   Widget _buildGroupRow(String type, int number) {
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -994,81 +1286,107 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             Expanded(
-              child: Text('$type$number', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold , fontSize: 10)),
+              child: Text('$type$number',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
             ),
-            ...List.generate(courses.length, (index) => Expanded(
-              child: TextField(
-                style: TextStyle(fontSize: 10),
-                decoration: InputDecoration(
-                  hintText: '',
-                  hintStyle: TextStyle(fontSize: 10),
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(vertical: 8.0),
-                  constraints: BoxConstraints(
-                    maxHeight: 30, // Hauteur maximale du TextField réduite
-                  ),
-                ),
-              ),
-            )),
+            ...List.generate(
+                courses.length,
+                (index) => Expanded(
+                      child: TextField(
+                        style: TextStyle(fontSize: 10),
+                        decoration: InputDecoration(
+                          hintText: '',
+                          hintStyle: TextStyle(fontSize: 10),
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                30, // Hauteur maximale du TextField réduite
+                          ),
+                        ),
+                      ),
+                    )),
           ],
         ),
       ),
     );
   }
-  void _updateCourses( String selectedParcours, String selectedSemestre) {
+
+  void _updateCourses(String selectedParcours, String selectedSemestre) {
     // Define course lists for each year and semester
     if (selectedParcours == 'L1') {
       if (selectedSemestre == 'Semestre 1') {
         courses = [
-          'Analyse1', 'Algèbre 1', 'ASD', 'Structure Machine 1',
-          'Terminologie Scientifique', 'Langue Étrangère',
+          'Analyse1',
+          'Algèbre 1',
+          'ASD',
+          'Structure Machine 1',
+          'Terminologie Scientifique',
+          'Langue Étrangère',
           'Option (Physique / Mécanique du Point)'
         ];
       } else {
         courses = [
-          'Analyse2', 'Algèbre 2', 'ASD 2', 'Structure Machine 2',
-          'Proba/ statistique', 'Technologies de l\'information et communication',
+          'Analyse2',
+          'Algèbre 2',
+          'ASD 2',
+          'Structure Machine 2',
+          'Proba/ statistique',
+          'Technologies de l\'information et communication',
           'Option (Physique / Mécanique du Point)'
         ];
       }
     } else if (selectedParcours == 'L2') {
       if (selectedSemestre == 'Semestre 1') {
         courses = [
-          'Architecture ordinateur', 'ASD3', 'THG', 'Système d\'information',
-          'Méthodes numériques', 'Logique mathématiques', 'Langue étrangère 2'
+          'Architecture ordinateur',
+          'ASD3',
+          'THG',
+          'Système d\'information',
+          'Méthodes numériques',
+          'Logique mathématiques',
+          'Langue étrangère 2'
         ];
       } else {
         courses = [
-          'THL', 'Système d\'exploitation 1', 'Base de données', 'Réseaux',
-          'Programmation orientée objet', 'Développement applications web',
+          'THL',
+          'Système d\'exploitation 1',
+          'Base de données',
+          'Réseaux',
+          'Programmation orientée objet',
+          'Développement applications web',
           'Langue étrangère 3'
         ];
       }
     } else if (selectedParcours == 'L3') {
       if (selectedSemestre == 'Semestre 1') {
         courses = [
-          'Système d\'exploitation 2', 'Compilation', 'IHM', 'Génie logiciel',
-          'Programmation linéaire', 'Probabilités et statistiques',
+          'Système d\'exploitation 2',
+          'Compilation',
+          'IHM',
+          'Génie logiciel',
+          'Programmation linéaire',
+          'Probabilités et statistiques',
           'Économie numérique'
         ];
       } else {
         courses = [
-          'Applications mobiles', 'Sécurité informatique', 'Intelligence artificielle', 'Données semi-structurées',
-          'Rédaction scientifique', 'Projet',
+          'Applications mobiles',
+          'Sécurité informatique',
+          'Intelligence artificielle',
+          'Données semi-structurées',
+          'Rédaction scientifique',
+          'Projet',
           'Création et développement web'
         ];
       }
     }
   }
-
-
-
-
-
 }
+class StatusData {
+  final String status;
+  final int count;
 
-
-
-
-
-
+  StatusData(this.status, this.count);
+}
