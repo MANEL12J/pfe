@@ -313,11 +313,13 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                               context: context,
                               builder: (context) {
                                 return Dialog(
+                                  backgroundColor: Colors.white,
                                   child: StatefulBuilder(
                                     builder: (BuildContext context, StateSetter setState) {
                                       return Container(
-                                        width: MediaQuery.of(context).size.width * 0.9,
-                                        height: MediaQuery.of(context).size.height * 0.9,
+                                        color: Colors.white,
+                                        width: MediaQuery.of(context).size.width * 0.95,
+                                        height: MediaQuery.of(context).size.height * 0.95,
                                         child: SingleChildScrollView(
                                           child: premierTabContent(setState: setState),
                                         ),
@@ -339,10 +341,13 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                                   return StatefulBuilder(
                                     builder: (BuildContext context, StateSetter setState) {
                                       return Dialog(
+                                        backgroundColor: Colors.white,
                                         child: Container(
-                                          width: MediaQuery.of(context).size.width * 0.9,
-                                          height: MediaQuery.of(context).size.height * 0.9,
+                                          color: Colors.white,
+                                          width: MediaQuery.of(context).size.width * 0.99,
+                                          height: MediaQuery.of(context).size.height * 0.95,
                                           child: Card(
+                                             color: Colors.white,
                                             margin: EdgeInsets.all(20),
                                             child: StreamBuilder<QuerySnapshot>(
                                               stream: FirebaseFirestore.instance
@@ -361,7 +366,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                                                 return Row(
                                                   children: [
                                                     Expanded(
-                                                      flex: 3,
+                                                      flex: 2,
                                                       child: buildUsersTable(users, context, onSelectUser: (String userId) {
                                                         setState(() {
                                                           selectedUserId2 = userId;
@@ -599,8 +604,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     );
   }
 
-  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context,
-      {required Function(String) onSelectUser}) {
+  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context, {required Function(String) onSelectUser}) {
     if (users.isEmpty) {
       return Center(child: Text("Pas d'enseignants trouvé"));
     }
@@ -655,9 +659,12 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       vertical: 10.0, horizontal: 16.0),
-                  child: Row(
+                  child:  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: headers.map((header) {
+                      if (header == "statu") {
+                        return Expanded(child: statusWidget(user[header]));
+                      }
                       return Expanded(
                         child: Text(
                           '${user[header] ?? 'N/A'}',
@@ -840,14 +847,13 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 child: GridView.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 1, // Single column for a table-like layout
-                    childAspectRatio: MediaQuery.of(context).size.width /
-                        70, // Adjust childAspectRatio based on screen width to fix height
+                    childAspectRatio: MediaQuery.of(context).size.width / 95, // Adjust childAspectRatio based on screen width to fix height
                   ),
                   itemCount: modules.length,
                   itemBuilder: (context, index) {
                     Map<String, dynamic> module = modules[index];
                     return Container(
-                      height: 30, // Fixed height for each row
+                      height: 270, // Fixed height for each row
                       decoration: BoxDecoration(
                         border: Border(
                           bottom:
@@ -858,7 +864,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                         ),
                       ),
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10.0),
+                        padding: EdgeInsets.symmetric(horizontal: 9.0),
                         child: Row(
                           children: [
                             Expanded(
@@ -867,7 +873,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                               child: Text("Module: ${module['moduleName']}",
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 15)),
+                                      fontSize: 13)),
                             ),
                             Expanded(
                               child: Text("Parcours: ${module['parcours']}",
@@ -875,7 +881,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                             ),
                             Expanded(
                               child: Text(
-                                  "Course: ${module['course'] ? 'Yes' : 'No'}",
+                                  "Cours: ${module['course'] ? 'Yes' : 'No'}",
                                   style: TextStyle(fontSize: 13)),
                             ),
                             Expanded(
