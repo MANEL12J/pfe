@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'repartion.dart';
@@ -17,7 +20,7 @@ class _navigationadjoint extends State<navigationadjoint> {
   Color primary = const Color(0xff89B5A2);
   late List<Widget> scr;
   _navigationadjoint(this.idnavigateur) {
-    scr = [AdjointRep(idnavigateur: "adjoint"), adjointboite()];
+    scr = [AdjointRep(idnavigateur: "adjoint"), AdjointBoite()];
   }
   final labelstyle = const TextStyle(fontWeight: FontWeight.bold, fontSize: 20);
   Color card = const Color(0xFFF9F9F9);
@@ -32,7 +35,7 @@ class _navigationadjoint extends State<navigationadjoint> {
       case 0:
         return AdjointRep(idnavigateur: "adjoint");
       case 1:
-        return adjointboite();
+        return AdjointBoite();
       default:
         return Center(child: Text('Error'));
     }
@@ -71,6 +74,48 @@ class _navigationadjoint extends State<navigationadjoint> {
       ),
     );
   }
+  
+
+
+  int totalUnreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    countUnreadDocuments().then((count) {
+      setState(() {
+        totalUnreadCount = count;
+      });
+    });
+  }
+
+  Future<int> countUnreadDocuments() async {
+    FirebaseFirestore firestore = FirebaseFirestore.instance;
+    CollectionReference users = firestore.collection('users');
+    int totalUnread = 0;
+
+    QuerySnapshot userSnapshot = await users.get();
+    for (var userDoc in userSnapshot.docs) {
+      String subCollectionName = 'adjoint${userDoc.id}';
+      QuerySnapshot unreadSnapshot = await firestore.collection('messagesadjointprof')
+          .doc('chats')
+          .collection(subCollectionName)
+          .where('read', isEqualTo: false)
+          .get();
+
+      totalUnread += unreadSnapshot.docs.length;
+    }
+    return totalUnread;
+  }
+  String buildTitle(int unreadCount) {
+    if (unreadCount > 0) {
+      return 'Boite de Réception ($unreadCount)';
+    } else {
+      return 'Boite de Réception';
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -84,27 +129,37 @@ class _navigationadjoint extends State<navigationadjoint> {
               padding: EdgeInsets.only(left: 8),
               children: <Widget>[
                 DrawerHeader(
-                  child: RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'M',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                            fontSize: 24,
-                          ),
+                  child: Column(
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'M',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                                fontSize: 24,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'atiérelink',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                                fontSize: 20,
+                              ),
+                            ),
+                          ],
                         ),
-                        TextSpan(
-                          text: 'atiérelink',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                            fontSize: 20,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: 15,),
+                      Text('Adjoint' , style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        fontSize: 23,
+                      ),)
+                    ],
                   ),
                 ),
                 _buildDrawerItem(
@@ -114,7 +169,7 @@ class _navigationadjoint extends State<navigationadjoint> {
                   onTap: () => _onSelectItem(0),
                 ),
                 _buildDrawerItem(
-                  title: 'Boite de Réception',
+                  title: buildTitle(totalUnreadCount),
                   icon: Icons.chat_outlined,
                   isSelected: selectedindex == 1,
                   onTap: () => _onSelectItem(1),

@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:syncfusion_flutter_charts/charts.dart'; // Alias for the external badges package
 
-
 class AdjointRep extends StatefulWidget {
   String idnavigateur;
   AdjointRep({Key? key, required this.idnavigateur}) : super(key: key);
@@ -13,7 +12,7 @@ class AdjointRep extends StatefulWidget {
   _AdjointRep createState() => _AdjointRep(idnavigateur);
 }
 
-class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
+class _AdjointRep extends State<AdjointRep> {
   String idnavigateur;
   _AdjointRep(this.idnavigateur);
 
@@ -25,11 +24,9 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
   final List<String> semestres = ['Semestre 1', 'Semestre 2'];
   final TextEditingController groupeController = TextEditingController();
   Widget? customTable;
-  late TabController _tabController;
-  int _selectedTabIndex = 0;
+
   List<Map<String, dynamic>> filteredUsers = [];
-  Future<List<Map<String, dynamic>>> getUsersByParcoursAndSemester(
-      String parcours, String semester) async {
+  Future<List<Map<String, dynamic>>> getUsersByParcoursAndSemester(String parcours, String semester) async {
     List<Map<String, dynamic>> usersData = [];
     var usersSnapshot =
         await FirebaseFirestore.instance.collection('users').get();
@@ -62,7 +59,6 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     }
     return usersData;
   }
-
   String abbreviate(String text) {
     List<String> words = text.split(' '); // Sépare le texte en mots.
     List<String> ignoreWords = [
@@ -104,19 +100,6 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _fetchChartData();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      setState(() {
-        _selectedTabIndex =
-            _tabController.index; // Update the selected tab index
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   String? selectedUserId;
@@ -185,9 +168,11 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       }
     });
   }
+
   List<StatusData> _chartData = [];
   Future<void> _fetchChartData() async {
-    QuerySnapshot querySnapshot = await FirebaseFirestore.instance.collection('users').get();
+    QuerySnapshot querySnapshot =
+        await FirebaseFirestore.instance.collection('users').get();
     Map<String, int> statusCounts = {
       'valider': 0,
       'en attente': 0,
@@ -208,8 +193,9 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       _chartData = pieData;
     });
   }
+
   Color blue = Color(0xff0036FE);
-  Color red  = Color(0xffDD6DF1);
+  Color red = Color(0xffDD6DF1);
   Color Green = Color(0xff1BD0A3);
   Color orange = Color(0xffFD6803);
 
@@ -223,16 +209,30 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     ];
     return Scaffold(
       backgroundColor: Colors.white,
-
-      floatingActionButton:
-      StreamBuilder(
+      appBar: AppBar(
+        automaticallyImplyLeading: false, // Disables the back arrow
+        title: Text(
+          'Effectuer répartion ',
+          style: TextStyle(
+            color: Colors.blueGrey,
+            fontWeight:
+                FontWeight.bold, // Adds boldness to the title for emphasis
+            fontSize: 20, // Increases the font size
+          ),
+        ),
+        // Sets a deep blue-grey as the background color
+        elevation: 2,
+      ),
+      floatingActionButton: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('messages')
-            .where('userId', isEqualTo: "chef") // Assuming 'idChief' is the chief's user ID
+            .where('userId',
+                isEqualTo: "chef") // Assuming 'idChief' is the chief's user ID
             .where('isRead', isEqualTo: false)
             .snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          int unreadMessages = snapshot.hasData ? snapshot.data!.docs.length : 0;
+          int unreadMessages =
+              snapshot.hasData ? snapshot.data!.docs.length : 0;
 
           return badges.Badge(
             badgeContent: Text(
@@ -243,12 +243,14 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
             badgeColor: Colors.red,
             position: BadgePosition.topEnd(top: 3, end: 3),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(20.0), // Adjust the radius as needed
+              borderRadius:
+                  BorderRadius.circular(20.0), // Adjust the radius as needed
               child: FloatingActionButton(
                 elevation: 0,
                 highlightElevation: 0,
                 onPressed: () {
-                  markMessagesAsRead('chef'); // Mark the messages as read when the dialog is opened
+                  markMessagesAsRead(
+                      'chef'); // Mark the messages as read when the dialog is opened
                   showDialog(
                     context: context,
                     builder: (context) => buildChatDialog(context),
@@ -261,195 +263,199 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
           );
         },
       ),
-
-
-
-
-
-
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: TabBar(
-                isScrollable: true,
-                controller: _tabController,
-                indicatorColor: Colors.blueAccent,
-                indicatorWeight: 5.0,
-                labelStyle: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue),
-                unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal),
-                labelColor: Colors.black,
-                labelPadding: const EdgeInsets.only(left: 30, right: 30),
-                unselectedLabelColor: Colors.grey,
-                tabs: [
-                  Tab(text: "Répartition"),
-                  Tab(text: "Liste fiches des voeux"),
-                  Tab(text: "Boite de Réception"),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-                controller: _tabController,
-                physics: NeverScrollableScrollPhysics(),
+      body: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
                 children: [
-                  //PREMIER TAB
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => showDialog(
-                              context: context,
-                              builder: (context) {
-                                return Dialog(
-                                  backgroundColor: Colors.white,
-                                  child: StatefulBuilder(
-                                    builder: (BuildContext context, StateSetter setState) {
-                                      return Container(
-                                        color: Colors.white,
-                                        width: MediaQuery.of(context).size.width * 0.95,
-                                        height: MediaQuery.of(context).size.height * 0.95,
-                                        child: SingleChildScrollView(
-                                          child: premierTabContent(setState: setState),
-                                        ),
-                                      );
-                                    },
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (context) {
+                          return Dialog(
+                            backgroundColor: Colors.white,
+                            child: StatefulBuilder(
+                              builder: (BuildContext context, StateSetter setState) {
+                                return Container(
+                                  color: Colors.white,
+                                  width: MediaQuery.of(context).size.width * 0.95,
+                                  height: MediaQuery.of(context).size.height * 0.95,
+                                  child: SingleChildScrollView(
+                                    child: premierTabContent(setState: setState),
                                   ),
                                 );
                               },
                             ),
-                            child: Text('Répartion'),
-                          ),
+                          );
+                        },
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        primary: blue,  // Background color
+                        padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
+                        textStyle: TextStyle(fontSize: 18 ,color: Colors.white),  // Bigger text
+                        minimumSize: Size(double.infinity, 100),  // Minimum size to be height 50
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5)  // Border radius
                         ),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return StatefulBuilder(
-                                    builder: (BuildContext context, StateSetter setState) {
-                                      return Dialog(
-                                        backgroundColor: Colors.white,
-                                        child: Container(
-                                          color: Colors.white,
-                                          width: MediaQuery.of(context).size.width * 0.99,
-                                          height: MediaQuery.of(context).size.height * 0.95,
-                                          child: Card(
-                                             color: Colors.white,
-                                            margin: EdgeInsets.all(20),
-                                            child: StreamBuilder<QuerySnapshot>(
-                                              stream: FirebaseFirestore.instance
-                                                  .collection('users')
-                                                  .orderBy('timestamp', descending: true)
-                                                  .snapshots(),
-                                              builder: (context, snapshot) {
-                                                if (snapshot.hasError) return Text('Error: ${snapshot.error}');
-                                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                                  return Center(child: CircularProgressIndicator());
-                                                }
-                                                List<Map<String, dynamic>> users = snapshot.data!.docs.map((DocumentSnapshot document) {
-                                                  return document.data() as Map<String, dynamic>;
-                                                }).toList();
-
-                                                return Row(
-                                                  children: [
-                                                    Expanded(
-                                                      flex: 2,
-                                                      child: buildUsersTable(users, context, onSelectUser: (String userId) {
-                                                        setState(() {
-                                                          selectedUserId2 = userId;
-                                                        });
-                                                      }),
-                                                    ),
-                                                    Expanded(
-                                                      flex: 3,
-                                                      child: selectedUserId2 == null
-                                                          ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
-                                                          : userDetails(selectedUserId2!),
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
-                              );
-                            },
-                            child: Text('Liste des voeux'),
-                          ),
-                        ),
-                        Expanded(
-                          child: SfCircularChart(
-                            title: ChartTitle(text: 'Visualisation des listes des voeux'),
-                            legend: Legend(
-                              isVisible: true,
-                              overflowMode: LegendItemOverflowMode.wrap,
-                            ),
-                            series: <CircularSeries>[
-                              DoughnutSeries<StatusData, String>(
-                                dataSource: _chartData,
-                                xValueMapper: (StatusData data, _) => data.status,
-                                yValueMapper: (StatusData data, _) => data.count,
-                                dataLabelMapper: (StatusData data, _) => '${data.status}: ${data.count}',
-                                dataLabelSettings: DataLabelSettings(isVisible: true),
-                                pointColorMapper: (StatusData data, _) {
-                                  switch (data.status) {
-                                    case 'valider':
-                                      return  Green;
-                                    case 'en attente':
-                                      return orange;
-                                    default:
-                                      return Colors.grey;
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.reorder , color: Colors.white,),
+                          SizedBox(width: 8),
+                          Text('Répartition', style: TextStyle(fontSize: 18 , color: Colors.white)),  // Bigger text
+                        ],
+                      ),
                     ),
                   ),
-                  //DEUXIEUR  TAB
-                  Container(
-                    child: deuxiemeTabContent(),
+                  SizedBox(width: 30,),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return StatefulBuilder(
+                              builder: (BuildContext context, StateSetter setState) {
+                                return Dialog(
+                                  backgroundColor: Colors.white,
+                                  child: Container(
+                                    color: Colors.white,
+                                    width: MediaQuery.of(context).size.width * 0.99,
+                                    height: MediaQuery.of(context).size.height * 0.95,
+                                    child: Card(
+                                      color: Colors.white,
+                                      margin: EdgeInsets.all(20),
+                                      child: StreamBuilder<QuerySnapshot>(
+                                        stream: FirebaseFirestore.instance
+                                            .collection('users')
+                                            .orderBy('timestamp', descending: true)
+                                            .snapshots(),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasError)
+                                            return Text('Error: ${snapshot.error}');
+                                          if (snapshot.connectionState ==
+                                              ConnectionState.waiting) {
+                                            return Center(child: CircularProgressIndicator());
+                                          }
+                                          List<Map<String, dynamic>> users =
+                                          snapshot.data!.docs.map((DocumentSnapshot document) {
+                                            return document.data() as Map<String, dynamic>;
+                                          }).toList();
+
+                                          return Row(
+                                            children: [
+                                              Expanded(
+                                                flex: 2,
+                                                child: buildUsersTable(users, context, onSelectUser: (String userId) {
+                                                  setState(() {
+                                                    selectedUserId2 = userId;
+                                                  });
+                                                }),
+                                              ),
+                                              Expanded(
+                                                flex: 3,
+                                                child: selectedUserId2 == null
+                                                    ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
+                                                    : userDetails(selectedUserId2!),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        primary: red,  // Bakground color
+                        padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
+                        textStyle: TextStyle(fontSize: 18),  // Bigger text
+                        minimumSize: Size(double.infinity, 100),  // Minimum size to be height 50
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5)  // Border radius
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.list , color: Colors.white,),
+                          SizedBox(width: 8),
+                          Text('Liste des voeux', style: TextStyle(fontSize: 18 , color: Colors.white)),  // Bigger text
+                        ],
+                      ),
+                    ),
                   ),
-                  //TROISIEME TAB
-                  Container(),
-                ]),
-          ),
-        ],
-      ),
+                ],
+              )
+
+            ),
+            SizedBox(height: 60,),
+            Expanded(
+              child: SfCircularChart(
+                title: ChartTitle(text: 'Visualisation des listes des voeux', textStyle: TextStyle(fontSize: 18)),  // Bigger title
+                legend: Legend(
+                  isVisible: true,
+                  overflowMode: LegendItemOverflowMode.wrap,
+                  textStyle: TextStyle(fontSize: 14),  // Bigger legend text
+                ),
+                series: <CircularSeries>[
+                  DoughnutSeries<StatusData, String>(
+                    dataSource: _chartData,
+                    xValueMapper: (StatusData data, _) => data.status,
+                    yValueMapper: (StatusData data, _) => data.count,
+                    dataLabelMapper: (StatusData data, _) => '${data.status}: ${data.count}',
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: true,
+                      // Bigger data labels
+                    ),
+                    pointColorMapper: (StatusData data, _) {
+                      switch (data.status) {
+                        case 'valider':
+                          return Colors.green;
+                        case 'en attente':
+                          return Colors.orange;
+                        default:
+                          return Colors.grey;
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      )
+
     );
   }
 
   Widget buildChatDialog(BuildContext context) {
-    double width = MediaQuery.of(context).size.width * 0.4; // Wider dialog for better readability
-    double height = MediaQuery.of(context).size.height * 0.99; // Adjust height to match
+    double width = MediaQuery.of(context).size.width *
+        0.4; // Wider dialog for better readability
+    double height =
+        MediaQuery.of(context).size.height * 0.99; // Adjust height to match
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), // Rounded corners for the dialog
+      shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(20)), // Rounded corners for the dialog
       child: StatefulBuilder(
         builder: (BuildContext context, StateSetter setState) {
           return Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20), // Rounded corners for the container
+              borderRadius: BorderRadius.circular(
+                  20), // Rounded corners for the container
             ),
             width: width,
             height: height,
@@ -488,7 +494,9 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
       ),
     );
   }
-  Widget buildInputField(BuildContext context, TextEditingController messageController, double width) {
+
+  Widget buildInputField(BuildContext context,
+      TextEditingController messageController, double width) {
     // Implement your input field for messages here
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -506,21 +514,20 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 filled: true,
                 fillColor: Colors.grey[200],
               ),
-
             ),
           ),
           IconButton(
-            splashColor: Colors.transparent, // Remove splash effect on button press
+            splashColor:
+                Colors.transparent, // Remove splash effect on button press
             highlightColor: Colors.transparent,
             icon: Icon(Icons.send, color: Colors.blue),
             onPressed: () => _sendMessage(messageController.text, idnavigateur),
-
           ),
-
         ],
       ),
     );
   }
+
   Widget buildMessageList(BuildContext context, double width) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -541,20 +548,26 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
           itemCount: chatDocs.length,
           itemBuilder: (ctx, index) {
             var message = chatDocs[index];
-            var isMe = message['userId'] == idnavigateur; // Compare message userId with current user's ID
+            var isMe = message['userId'] ==
+                idnavigateur; // Compare message userId with current user's ID
             var messageTime = message['createdAt'] as Timestamp;
-            var formattedTime = DateFormat('HH:mm').format(messageTime.toDate());
+            var formattedTime =
+                DateFormat('HH:mm').format(messageTime.toDate());
 
             return Row(
-              mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              mainAxisAlignment:
+                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
               children: [
-                if (!isMe) Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: CircleAvatar(
-                    // You can display the sender's initials or an icon
-                    child: Text(message['userId'].substring(0, 1).toUpperCase()), // Display first letter of userId
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: CircleAvatar(
+                      // You can display the sender's initials or an icon
+                      child: Text(message['userId']
+                          .substring(0, 1)
+                          .toUpperCase()), // Display first letter of userId
+                    ),
                   ),
-                ),
                 ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: width * 0.7, // Maximum width for a message bubble
@@ -563,18 +576,21 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                     padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                     margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     decoration: BoxDecoration(
-                      color: isMe ? Colors.grey[100] : Colors.blue[300], // Different colors for sender/receiver
+                      color: isMe
+                          ? Colors.grey[100]
+                          : Colors.blue[
+                              300], // Different colors for sender/receiver
                       borderRadius: isMe
                           ? BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                        bottomLeft: Radius.circular(12),
-                      )
+                              topLeft: Radius.circular(12),
+                              topRight: Radius.circular(12),
+                              bottomLeft: Radius.circular(12),
+                            )
                           : BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                        bottomRight: Radius.circular(12),
-                      ),
+                              topLeft: Radius.circular(12),
+                              topRight: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,7 +620,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     );
   }
 
-  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context, {required Function(String) onSelectUser}) {
+  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context,
+      {required Function(String) onSelectUser}) {
     if (users.isEmpty) {
       return Center(child: Text("Pas d'enseignants trouvé"));
     }
@@ -659,7 +676,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       vertical: 10.0, horizontal: 16.0),
-                  child:  Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: headers.map((header) {
                       if (header == "statu") {
@@ -847,7 +864,8 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
                 child: GridView.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 1, // Single column for a table-like layout
-                    childAspectRatio: MediaQuery.of(context).size.width / 95, // Adjust childAspectRatio based on screen width to fix height
+                    childAspectRatio: MediaQuery.of(context).size.width /
+                        95, // Adjust childAspectRatio based on screen width to fix height
                   ),
                   itemCount: modules.length,
                   itemBuilder: (context, index) {
@@ -1390,6 +1408,7 @@ class _AdjointRep extends State<AdjointRep> with TickerProviderStateMixin {
     }
   }
 }
+
 class StatusData {
   final String status;
   final int count;
