@@ -20,16 +20,20 @@ class _AdjointRep extends State<AdjointRep> {
   String? selectedParcours;
   String? selectedSemestre;
   int? nombreGroupes;
+  int nombreGroupes2  = 0 ;
   final List<String> parcours = ['L1', 'L2', 'L3', 'M1', 'M2'];
   final List<String> semestres = ['Semestre 1', 'Semestre 2'];
   final TextEditingController groupeController = TextEditingController();
+  List<TextEditingController> emptyRowControllers = [];
+  List<List<TextEditingController>> groupControllersTD = [];
+  List<List<TextEditingController>> groupControllersTP = [];
   Widget? customTable;
 
   List<Map<String, dynamic>> filteredUsers = [];
   Future<List<Map<String, dynamic>>> getUsersByParcoursAndSemester(String parcours, String semester) async {
     List<Map<String, dynamic>> usersData = [];
     var usersSnapshot =
-        await FirebaseFirestore.instance.collection('users').get();
+    await FirebaseFirestore.instance.collection('users').get();
 
     for (var user in usersSnapshot.docs) {
       // Get additional user info such as displayName and grade
@@ -38,7 +42,7 @@ class _AdjointRep extends State<AdjointRep> {
 
       // Navigate into the specific semester collection in 'fiche de voeux'
       var ficheSnapshot =
-          await user.reference.collection('fiche de voeux').doc(semester).get();
+      await user.reference.collection('fiche de voeux').doc(semester).get();
       if (ficheSnapshot.exists) {
         var modules = ficheSnapshot.data()?['modules'] as List;
         for (var module in modules) {
@@ -111,8 +115,7 @@ class _AdjointRep extends State<AdjointRep> {
   }
 
   String searchText = '';
-  void _valider(StateSetter updateState, String selectedParcours,
-      String selectedSemestre, TextEditingController groupeController) async {
+  void _valider(StateSetter updateState, String selectedParcours, String selectedSemestre, TextEditingController groupeController) async {
     if (selectedParcours.isNotEmpty &&
         selectedSemestre.isNotEmpty &&
         groupeController.text.isNotEmpty) {
@@ -120,20 +123,27 @@ class _AdjointRep extends State<AdjointRep> {
       if (nombreGroupes != null) {
         // Détermination du semestre correct
         String semestre =
-            selectedSemestre == "Semestre 1" ? "semetre1" : "semetre2";
+        selectedSemestre == "Semestre 1" ? "semetre1" : "semetre2";
 
         // Récupération des utilisateurs correspondant au parcours et au semestre
         List<Map<String, dynamic>> users =
-            await getUsersByParcoursAndSemester(selectedParcours, semestre);
+        await getUsersByParcoursAndSemester(selectedParcours, semestre);
 
-        // Mise à jour de l'interface utilisateur dans le dialogue
+        // Mise à jour de l'état de manière synchrone
         updateState(() {
           filteredUsers = users;
-          customTable = _buildCustomTable(
-              selectedParcours, selectedSemestre, nombreGroupes);
+          nombreGroupes2 = int.tryParse(groupeController.text)!;
+          _updateCourses(selectedParcours, selectedSemestre);
+          if (courses.isNotEmpty) {
+            _initializeControllers(nombreGroupes2);
+            customTable = _buildCustomTable(selectedParcours, selectedSemestre, nombreGroupes);
+          } else {
+            customTable = null;
+          }
         });
+
       } else {
-        // Réinitialisation de l'interface utilisateur en cas d'erreur
+        // Réinitialisation de l'état en cas d'erreur
         updateState(() {
           filteredUsers = [];
           customTable = null;
@@ -141,9 +151,97 @@ class _AdjointRep extends State<AdjointRep> {
       }
     }
   }
+  void _initializeControllers(int nombreGroupes) {
+    emptyRowControllers = List.generate(courses.length, (index) => TextEditingController());
+    groupControllersTD = List.generate(nombreGroupes, (groupIndex) {
+      return List.generate(courses.length, (courseIndex) => TextEditingController());
+
+    });
+    groupControllersTP = List.generate(nombreGroupes, (groupIndex) {
+      return List.generate(courses.length, (courseIndex) => TextEditingController());
+
+    });
+  }
+  void _showFormDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: StatefulBuilder(
+            builder: (BuildContext context, void Function(void Function()) setState) {
+              return Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                height: MediaQuery.of(context).size.height * 0.9,
+                child: premierTabContent(setState: setState),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+
+  Future<void> _saveDataToFirebase() async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+    final int anneeActuelle = DateTime.now().year;
+
+    // Boucle à travers les groupes TD
+    for (int i = 0; i < groupControllersTD.length; i++) {
+      final numeroGroupe = i + 1;
+
+      // Sauvegarde des données pour chaque module TD
+      for (int j = 0; j < groupControllersTD[i].length; j++) {
+        final module = courses[j];
+        final contenu = groupControllersTD[i][j].text;
+
+        if (contenu.isNotEmpty) {
+          await firestore
+              .collection('repartition')
+              .doc(anneeActuelle.toString())
+              .collection(selectedParcours!)
+              .doc(selectedSemestre!)
+              .collection('TD')
+              .add({
+            'prof': contenu,
+            'module': module,
+            'parcours': selectedParcours,
+            'semestre': selectedSemestre!,
+            'type' : ' TD: ${i+1}',
+          });
+        }
+      }
+    }
+
+    // Boucle à travers les groupes TP
+    for (int i = 0; i < groupControllersTP.length; i++) {
+      final numeroGroupe = i + 1;
+
+      // Sauvegarde des données pour chaque module TP
+      for (int j = 0; j < groupControllersTP[i].length; j++) {
+        final module = courses[j];
+        final contenu = groupControllersTP[i][j].text;
+
+        if (contenu.isNotEmpty) {
+          await firestore
+              .collection('repartition')
+              .doc(anneeActuelle.toString())
+              .collection(selectedParcours!)
+              .doc(selectedSemestre!)
+              .collection('TP')
+              .add({
+            'prof': contenu,
+            'module': module,
+            'parcours': selectedParcours,
+            'semestre': selectedSemestre!,
+            'type' : ' TP: ${i+1}',
+          });
+        }
+      }
+    }
+  }
 
   final TextEditingController _messageController = TextEditingController();
-
   void _sendMessage(String message, String userId) {
     if (message.isNotEmpty) {
       FirebaseFirestore.instance.collection('messages').add({
@@ -155,7 +253,6 @@ class _AdjointRep extends State<AdjointRep> {
       _messageController.clear();
     }
   }
-
   void markMessagesAsRead(String senderId) {
     FirebaseFirestore.instance
         .collection('messages')
@@ -168,11 +265,10 @@ class _AdjointRep extends State<AdjointRep> {
       }
     });
   }
-
   List<StatusData> _chartData = [];
   Future<void> _fetchChartData() async {
     QuerySnapshot querySnapshot =
-        await FirebaseFirestore.instance.collection('users').get();
+    await FirebaseFirestore.instance.collection('users').get();
     Map<String, int> statusCounts = {
       'valider': 0,
       'en attente': 0,
@@ -193,7 +289,6 @@ class _AdjointRep extends State<AdjointRep> {
       _chartData = pieData;
     });
   }
-
   Color blue = Color(0xff0036FE);
   Color red = Color(0xffDD6DF1);
   Color Green = Color(0xff1BD0A3);
@@ -208,237 +303,216 @@ class _AdjointRep extends State<AdjointRep> {
       orange,
     ];
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        automaticallyImplyLeading: false, // Disables the back arrow
-        title: Text(
-          'Effectuer répartion ',
-          style: TextStyle(
-            color: Colors.blueGrey,
-            fontWeight:
-                FontWeight.bold, // Adds boldness to the title for emphasis
-            fontSize: 20, // Increases the font size
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          automaticallyImplyLeading: false, // Disables the back arrow
+          title: Text(
+            'Effectuer répartion ',
+            style: TextStyle(
+              color: Colors.blueGrey,
+              fontWeight:
+              FontWeight.bold, // Adds boldness to the title for emphasis
+              fontSize: 20, // Increases the font size
+            ),
           ),
+          // Sets a deep blue-grey as the background color
+          elevation: 2,
         ),
-        // Sets a deep blue-grey as the background color
-        elevation: 2,
-      ),
-      floatingActionButton: StreamBuilder(
-        stream: FirebaseFirestore.instance
-            .collection('messages')
-            .where('userId',
-                isEqualTo: "chef") // Assuming 'idChief' is the chief's user ID
-            .where('isRead', isEqualTo: false)
-            .snapshots(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          int unreadMessages =
-              snapshot.hasData ? snapshot.data!.docs.length : 0;
+        floatingActionButton: StreamBuilder(
+          stream: FirebaseFirestore.instance
+              .collection('messages')
+              .where('userId',
+              isEqualTo: "chef") // Assuming 'idChief' is the chief's user ID
+              .where('isRead', isEqualTo: false)
+              .snapshots(),
+          builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+            int unreadMessages =
+            snapshot.hasData ? snapshot.data!.docs.length : 0;
 
-          return badges.Badge(
-            badgeContent: Text(
-              unreadMessages.toString(),
-              style: TextStyle(color: Colors.white),
-            ),
-            showBadge: unreadMessages > 0,
-            badgeColor: Colors.red,
-            position: BadgePosition.topEnd(top: 3, end: 3),
-            child: ClipRRect(
-              borderRadius:
-                  BorderRadius.circular(20.0), // Adjust the radius as needed
-              child: FloatingActionButton(
-                elevation: 0,
-                highlightElevation: 0,
-                onPressed: () {
-                  markMessagesAsRead(
-                      'chef'); // Mark the messages as read when the dialog is opened
-                  showDialog(
-                    context: context,
-                    builder: (context) => buildChatDialog(context),
-                  );
-                },
-                child: Icon(Icons.message),
-                backgroundColor: Colors.blue,
+            return badges.Badge(
+              badgeContent: Text(
+                unreadMessages.toString(),
+                style: TextStyle(color: Colors.white),
               ),
-            ),
-          );
-        },
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (context) {
-                          return Dialog(
-                            backgroundColor: Colors.white,
-                            child: StatefulBuilder(
-                              builder: (BuildContext context, StateSetter setState) {
-                                return Container(
-                                  color: Colors.white,
-                                  width: MediaQuery.of(context).size.width * 0.95,
-                                  height: MediaQuery.of(context).size.height * 0.95,
-                                  child: SingleChildScrollView(
-                                    child: premierTabContent(setState: setState),
-                                  ),
-                                );
-                              },
+              showBadge: unreadMessages > 0,
+              position: BadgePosition.topEnd(top: 3, end: 3),
+              child: ClipRRect(
+                borderRadius:
+                BorderRadius.circular(20.0), // Adjust the radius as needed
+                child: FloatingActionButton(
+                  elevation: 0,
+                  highlightElevation: 0,
+                  onPressed: () {
+                    markMessagesAsRead(
+                        'chef'); // Mark the messages as read when the dialog is opened
+                    showDialog(
+                      context: context,
+                      builder: (context) => buildChatDialog(context),
+                    );
+                  },
+                  child: Icon(Icons.message),
+                  backgroundColor: Colors.blue,
+                ),
+              ),
+            );
+          },
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(30.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _showFormDialog  ,
+                          style: ElevatedButton.styleFrom(
+                            primary: blue,  // Background color
+                            padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
+                            textStyle: TextStyle(fontSize: 18 ,color: Colors.white),  // Bigger text
+                            minimumSize: Size(double.infinity, 100),  // Minimum size to be height 50
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5)  // Border radius
                             ),
-                          );
-                        },
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        primary: blue,  // Background color
-                        padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
-                        textStyle: TextStyle(fontSize: 18 ,color: Colors.white),  // Bigger text
-                        minimumSize: Size(double.infinity, 100),  // Minimum size to be height 50
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(5)  // Border radius
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.reorder , color: Colors.white,),
+                              SizedBox(width: 8),
+                              Text('Répartition', style: TextStyle(fontSize: 18 , color: Colors.white)),  // Bigger text
+                            ],
+                          ),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.reorder , color: Colors.white,),
-                          SizedBox(width: 8),
-                          Text('Répartition', style: TextStyle(fontSize: 18 , color: Colors.white)),  // Bigger text
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 30,),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return StatefulBuilder(
-                              builder: (BuildContext context, StateSetter setState) {
-                                return Dialog(
-                                  backgroundColor: Colors.white,
-                                  child: Container(
-                                    color: Colors.white,
-                                    width: MediaQuery.of(context).size.width * 0.99,
-                                    height: MediaQuery.of(context).size.height * 0.95,
-                                    child: Card(
-                                      color: Colors.white,
-                                      margin: EdgeInsets.all(20),
-                                      child: StreamBuilder<QuerySnapshot>(
-                                        stream: FirebaseFirestore.instance
-                                            .collection('users')
-                                            .orderBy('timestamp', descending: true)
-                                            .snapshots(),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.hasError)
-                                            return Text('Error: ${snapshot.error}');
-                                          if (snapshot.connectionState ==
-                                              ConnectionState.waiting) {
-                                            return Center(child: CircularProgressIndicator());
-                                          }
-                                          List<Map<String, dynamic>> users =
-                                          snapshot.data!.docs.map((DocumentSnapshot document) {
-                                            return document.data() as Map<String, dynamic>;
-                                          }).toList();
+                      SizedBox(width: 30,),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return StatefulBuilder(
+                                  builder: (BuildContext context, StateSetter setState) {
+                                    return Dialog(
+                                      backgroundColor: Colors.white,
+                                      child: Container(
+                                        color: Colors.white,
+                                        width: MediaQuery.of(context).size.width * 0.99,
+                                        height: MediaQuery.of(context).size.height * 0.95,
+                                        child: Card(
+                                          color: Colors.white,
+                                          margin: EdgeInsets.all(20),
+                                          child: StreamBuilder<QuerySnapshot>(
+                                            stream: FirebaseFirestore.instance
+                                                .collection('users')
+                                                .orderBy('timestamp', descending: true)
+                                                .snapshots(),
+                                            builder: (context, snapshot) {
+                                              if (snapshot.hasError)
+                                                return Text('Error: ${snapshot.error}');
+                                              if (snapshot.connectionState ==
+                                                  ConnectionState.waiting) {
+                                                return Center(child: CircularProgressIndicator());
+                                              }
+                                              List<Map<String, dynamic>> users =
+                                              snapshot.data!.docs.map((DocumentSnapshot document) {
+                                                return document.data() as Map<String, dynamic>;
+                                              }).toList();
 
-                                          return Row(
-                                            children: [
-                                              Expanded(
-                                                flex: 2,
-                                                child: buildUsersTable(users, context, onSelectUser: (String userId) {
-                                                  setState(() {
-                                                    selectedUserId2 = userId;
-                                                  });
-                                                }),
-                                              ),
-                                              Expanded(
-                                                flex: 3,
-                                                child: selectedUserId2 == null
-                                                    ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
-                                                    : userDetails(selectedUserId2!),
-                                              ),
-                                            ],
-                                          );
-                                        },
+                                              return Row(
+                                                children: [
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: buildUsersTable(users, context, onSelectUser: (String userId) {
+                                                      setState(() {
+                                                        selectedUserId2 = userId;
+                                                      });
+                                                    }),
+                                                  ),
+                                                  Expanded(
+                                                    flex: 3,
+                                                    child: selectedUserId2 == null
+                                                        ? Center(child: Text("Sélectionnez un utilisateur pour voir les détails"))
+                                                        : userDetails(selectedUserId2!),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
+                                    );
+                                  },
                                 );
                               },
                             );
                           },
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        primary: red,  // Bakground color
-                        padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
-                        textStyle: TextStyle(fontSize: 18),  // Bigger text
-                        minimumSize: Size(double.infinity, 100),  // Minimum size to be height 50
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(5)  // Border radius
+                          style: ElevatedButton.styleFrom(
+                            primary: red,  // Bakground color
+                            padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
+                            textStyle: TextStyle(fontSize: 18),  // Bigger text
+                            minimumSize: Size(double.infinity, 100),  // Minimum size to be height 50
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5)  // Border radius
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.list , color: Colors.white,),
+                              SizedBox(width: 8),
+                              Text('Liste des voeux', style: TextStyle(fontSize: 18 , color: Colors.white)),  // Bigger text
+                            ],
+                          ),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.list , color: Colors.white,),
-                          SizedBox(width: 8),
-                          Text('Liste des voeux', style: TextStyle(fontSize: 18 , color: Colors.white)),  // Bigger text
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              )
+                    ],
+                  )
 
-            ),
-            SizedBox(height: 60,),
-            Expanded(
-              child: SfCircularChart(
-                title: ChartTitle(text: 'Visualisation des listes des voeux', textStyle: TextStyle(fontSize: 18)),  // Bigger title
-                legend: Legend(
-                  isVisible: true,
-                  overflowMode: LegendItemOverflowMode.wrap,
-                  textStyle: TextStyle(fontSize: 14),  // Bigger legend text
-                ),
-                series: <CircularSeries>[
-                  DoughnutSeries<StatusData, String>(
-                    dataSource: _chartData,
-                    xValueMapper: (StatusData data, _) => data.status,
-                    yValueMapper: (StatusData data, _) => data.count,
-                    dataLabelMapper: (StatusData data, _) => '${data.status}: ${data.count}',
-                    dataLabelSettings: DataLabelSettings(
-                      isVisible: true,
-                      // Bigger data labels
-                    ),
-                    pointColorMapper: (StatusData data, _) {
-                      switch (data.status) {
-                        case 'valider':
-                          return Colors.green;
-                        case 'en attente':
-                          return Colors.orange;
-                        default:
-                          return Colors.grey;
-                      }
-                    },
-                  ),
-                ],
               ),
-            ),
-          ],
-        ),
-      )
+              SizedBox(height: 60,),
+              Expanded(
+                child: SfCircularChart(
+                  title: ChartTitle(text: 'Visualisation des listes des voeux', textStyle: TextStyle(fontSize: 18)),  // Bigger title
+                  legend: Legend(
+                    isVisible: true,
+                    overflowMode: LegendItemOverflowMode.wrap,
+                    textStyle: TextStyle(fontSize: 14),  // Bigger legend text
+                  ),
+                  series: <CircularSeries>[
+                    DoughnutSeries<StatusData, String>(
+                      dataSource: _chartData,
+                      xValueMapper: (StatusData data, _) => data.status,
+                      yValueMapper: (StatusData data, _) => data.count,
+                      dataLabelMapper: (StatusData data, _) => '${data.status}: ${data.count}',
+                      dataLabelSettings: DataLabelSettings(
+                        isVisible: true,
+                        // Bigger data labels
+                      ),
+                      pointColorMapper: (StatusData data, _) {
+                        switch (data.status) {
+                          case 'valider':
+                            return Colors.green;
+                          case 'en attente':
+                            return Colors.orange;
+                          default:
+                            return Colors.grey;
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        )
 
     );
   }
-
   Widget buildChatDialog(BuildContext context) {
     double width = MediaQuery.of(context).size.width *
         0.4; // Wider dialog for better readability
@@ -448,7 +522,7 @@ class _AdjointRep extends State<AdjointRep> {
     return Dialog(
       shape: RoundedRectangleBorder(
           borderRadius:
-              BorderRadius.circular(20)), // Rounded corners for the dialog
+          BorderRadius.circular(20)), // Rounded corners for the dialog
       child: StatefulBuilder(
         builder: (BuildContext context, StateSetter setState) {
           return Container(
@@ -494,9 +568,7 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
-  Widget buildInputField(BuildContext context,
-      TextEditingController messageController, double width) {
+  Widget buildInputField(BuildContext context, TextEditingController messageController, double width) {
     // Implement your input field for messages here
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -518,7 +590,7 @@ class _AdjointRep extends State<AdjointRep> {
           ),
           IconButton(
             splashColor:
-                Colors.transparent, // Remove splash effect on button press
+            Colors.transparent, // Remove splash effect on button press
             highlightColor: Colors.transparent,
             icon: Icon(Icons.send, color: Colors.blue),
             onPressed: () => _sendMessage(messageController.text, idnavigateur),
@@ -527,7 +599,6 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
   Widget buildMessageList(BuildContext context, double width) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -552,11 +623,11 @@ class _AdjointRep extends State<AdjointRep> {
                 idnavigateur; // Compare message userId with current user's ID
             var messageTime = message['createdAt'] as Timestamp;
             var formattedTime =
-                DateFormat('HH:mm').format(messageTime.toDate());
+            DateFormat('HH:mm').format(messageTime.toDate());
 
             return Row(
               mainAxisAlignment:
-                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
               children: [
                 if (!isMe)
                   Padding(
@@ -579,18 +650,18 @@ class _AdjointRep extends State<AdjointRep> {
                       color: isMe
                           ? Colors.grey[100]
                           : Colors.blue[
-                              300], // Different colors for sender/receiver
+                      300], // Different colors for sender/receiver
                       borderRadius: isMe
                           ? BorderRadius.only(
-                              topLeft: Radius.circular(12),
-                              topRight: Radius.circular(12),
-                              bottomLeft: Radius.circular(12),
-                            )
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                        bottomLeft: Radius.circular(12),
+                      )
                           : BorderRadius.only(
-                              topLeft: Radius.circular(12),
-                              topRight: Radius.circular(12),
-                              bottomRight: Radius.circular(12),
-                            ),
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,9 +690,7 @@ class _AdjointRep extends State<AdjointRep> {
       },
     );
   }
-
-  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context,
-      {required Function(String) onSelectUser}) {
+  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context, {required Function(String) onSelectUser}) {
     if (users.isEmpty) {
       return Center(child: Text("Pas d'enseignants trouvé"));
     }
@@ -629,10 +698,10 @@ class _AdjointRep extends State<AdjointRep> {
     // Assuming that all documents have the same keys
     List<String> headers = users.first.keys
         .where((key) =>
-            key != "timestamp" &&
-            key != "uid" &&
-            key != "valide" &&
-            key != "email")
+    key != "timestamp" &&
+        key != "uid" &&
+        key != "valide" &&
+        key != "email")
         .toList();
     headers.sort((a, b) => a.compareTo(b)); // Sort headers alphabetically
 
@@ -648,16 +717,16 @@ class _AdjointRep extends State<AdjointRep> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: headers
                   .map((header) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
-                          child: Text(
-                            header,
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
-                          ),
-                        ),
-                      ))
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Text(
+                    header,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
+                ),
+              ))
                   .toList(),
             ),
           ),
@@ -698,7 +767,6 @@ class _AdjointRep extends State<AdjointRep> {
       ],
     );
   }
-
   Widget statusWidget(String? status) {
     switch (status) {
       case "rien":
@@ -740,7 +808,6 @@ class _AdjointRep extends State<AdjointRep> {
         return Container(); // Default case to handle unexpected status
     }
   }
-
 // Helper method to create a decorated container for dropdowns
   Widget decorBox({required Widget child}) {
     return Container(
@@ -760,7 +827,6 @@ class _AdjointRep extends State<AdjointRep> {
       child: child,
     );
   }
-
   Widget userSearchResults() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('users').snapshots(),
@@ -800,7 +866,7 @@ class _AdjointRep extends State<AdjointRep> {
                         fontSize: 10), // Smaller font size for subtitle
                   ),
                   trailing:
-                      Icon(Icons.arrow_forward_ios, size: 14), // Smaller icon
+                  Icon(Icons.arrow_forward_ios, size: 14), // Smaller icon
                   onTap: () => selectUser(documents[index]['uid']),
                   contentPadding: EdgeInsets.symmetric(
                       horizontal: 8.0, vertical: 4.0), // Reduced padding
@@ -812,7 +878,6 @@ class _AdjointRep extends State<AdjointRep> {
       },
     );
   }
-
   Widget userDetails(String? userId) {
     if (userId == null) {
       return Center(child: Text("", style: TextStyle(fontSize: 14)));
@@ -832,7 +897,6 @@ class _AdjointRep extends State<AdjointRep> {
       ],
     );
   }
-
   Widget semesterDetails(String? userId, String semester) {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -875,7 +939,7 @@ class _AdjointRep extends State<AdjointRep> {
                       decoration: BoxDecoration(
                         border: Border(
                           bottom:
-                              BorderSide(color: Colors.grey[300]!, width: 1),
+                          BorderSide(color: Colors.grey[300]!, width: 1),
                           top: BorderSide(color: Colors.grey[300]!, width: 1),
                           left: BorderSide(color: Colors.grey[300]!, width: 1),
                           right: BorderSide(color: Colors.grey[300]!, width: 1),
@@ -887,7 +951,7 @@ class _AdjointRep extends State<AdjointRep> {
                           children: [
                             Expanded(
                               flex:
-                                  3, // Allocates 3 parts of space for the module name, more space due to potential length
+                              3, // Allocates 3 parts of space for the module name, more space due to potential length
                               child: Text("Module: ${module['moduleName']}",
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
@@ -923,7 +987,6 @@ class _AdjointRep extends State<AdjointRep> {
       },
     );
   }
-
   Widget deuxiemeTabContent() {
     return Row(
       children: <Widget>[
@@ -958,7 +1021,7 @@ class _AdjointRep extends State<AdjointRep> {
                           contentPadding: EdgeInsets.symmetric(
                               horizontal: 10.0,
                               vertical:
-                                  0), // No vertical padding inside the TextField
+                              0), // No vertical padding inside the TextField
                           border: OutlineInputBorder(
                             // Changed to OutlineInputBorder for clearer visibility
                             borderRadius: BorderRadius.circular(
@@ -978,7 +1041,7 @@ class _AdjointRep extends State<AdjointRep> {
                             // Border style when the TextField is enabled but not focused
                             borderRadius: BorderRadius.circular(8.0),
                             borderSide:
-                                BorderSide(color: Colors.grey, width: 1.0),
+                            BorderSide(color: Colors.grey, width: 1.0),
                           ),
                         ),
                       ),
@@ -1083,19 +1146,51 @@ class _AdjointRep extends State<AdjointRep> {
                 SizedBox(width: 10),
                 // Button to validate the input
                 ElevatedButton(
-                  onPressed: () {
-                    _valider(setState, selectedParcours!, selectedSemestre!,
-                        groupeController);
+                  onPressed: () async {
+                     _valider(setState, selectedParcours!, selectedSemestre!, groupeController);
+                    int? groupenumber = int.tryParse(groupeController.text);
+                    if (courses.isNotEmpty) {
+                      emptyRowControllers = List.generate(courses.length, (index) => TextEditingController());
+                      groupControllersTD = List.generate(nombreGroupes2, (groupIndex) {
+                        return List.generate(courses.length, (courseIndex) => TextEditingController());
+                      });
+                      groupControllersTP = List.generate(nombreGroupes2, (groupIndex) {
+                        return List.generate(courses.length, (courseIndex) => TextEditingController());
+                      });
+                    }
+                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+                     print(courses.length);
+                     print(nombreGroupes2);
+                     print(groupControllersTD.length);
+                     print(groupControllersTP.length);
+                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
                   },
                   style: ElevatedButton.styleFrom(
                     primary: Colors.blueAccent, // Button color
                     shape: RoundedRectangleBorder(
                       borderRadius:
-                          BorderRadius.circular(12), // Rounded corners
+                      BorderRadius.circular(12), // Rounded corners
                     ),
                   ),
                   child: Text(
                     'Valider',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: _saveDataToFirebase,
+                  style: ElevatedButton.styleFrom(
+                    primary: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Save',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -1121,7 +1216,7 @@ class _AdjointRep extends State<AdjointRep> {
                         alignment: Alignment.topLeft,
                         child: Expanded(
                           child:
-                              customTable!, // Assurez-vous que customTable est capable de gérer l'overflow.
+                          customTable!, // Assurez-vous que customTable est capable de gérer l'overflow.
                         ),
                       ),
                     ),
@@ -1150,46 +1245,46 @@ class _AdjointRep extends State<AdjointRep> {
                         ),
                         Expanded(
                             child: ListView.builder(
-                          itemCount: filteredUsers.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            var user = filteredUsers[index];
-                            return Card(
-                              elevation: 2,
-                              margin: const EdgeInsets.symmetric(
-                                  vertical: 4, horizontal: 8),
-                              child: ListTile(
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                        child: Text(
-                                      user['displayName'],
+                              itemCount: filteredUsers.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                var user = filteredUsers[index];
+                                return Card(
+                                  elevation: 2,
+                                  margin: const EdgeInsets.symmetric(
+                                      vertical: 4, horizontal: 8),
+                                  child: ListTile(
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                            child: Text(
+                                              user['displayName'],
+                                              overflow: TextOverflow
+                                                  .ellipsis, // Ajoute des points de suspension si nécessaire
+                                              maxLines:
+                                              1, // Garde le texte sur une seule ligne
+                                            )),
+                                        Expanded(
+                                            child: Text(
+                                              abbreviate(user['grade']),
+                                              overflow: TextOverflow
+                                                  .ellipsis, // Ajoute des points de suspension si nécessaire
+                                              maxLines:
+                                              1, // Garde le texte sur une seule ligne
+                                            ))
+                                      ],
+                                    ),
+                                    subtitle: Text(
+                                      "Module: ${user['moduleName']}",
+                                      style: TextStyle(fontWeight: FontWeight.bold),
                                       overflow: TextOverflow
-                                          .ellipsis, // Ajoute des points de suspension si nécessaire
+                                          .ellipsis, // Gère le texte long dans le sous-titre
                                       maxLines:
-                                          1, // Garde le texte sur une seule ligne
-                                    )),
-                                    Expanded(
-                                        child: Text(
-                                      abbreviate(user['grade']),
-                                      overflow: TextOverflow
-                                          .ellipsis, // Ajoute des points de suspension si nécessaire
-                                      maxLines:
-                                          1, // Garde le texte sur une seule ligne
-                                    ))
-                                  ],
-                                ),
-                                subtitle: Text(
-                                  "Module: ${user['moduleName']}",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                  overflow: TextOverflow
-                                      .ellipsis, // Gère le texte long dans le sous-titre
-                                  maxLines:
                                       1, // Garde le sous-titre sur une seule ligne
-                                ),
-                              ),
-                            );
-                          },
-                        )),
+                                    ),
+                                  ),
+                                );
+                              },
+                            )),
                       ],
                     ),
                   ),
@@ -1201,10 +1296,8 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
-  Widget _buildCustomTable(
-      String selectedParcours, String selectedSemestre, int numberOfGroups) {
-    _updateCourses(selectedParcours, selectedSemestre);
+  Widget _buildCustomTable(String selectedParcours, String selectedSemestre, int numberOfGroups) {
+     _valider((fn) { }, selectedParcours, selectedSemestre, groupeController);
     List<Widget> rows = [
       Divider(),
       _buildCoursesHeader(),
@@ -1215,16 +1308,16 @@ class _AdjointRep extends State<AdjointRep> {
 
     // Adding all TDs
     for (int i = 1; i <= numberOfGroups; i++) {
-      rows.add(_buildGroupRow('TD', i));
+      rows.add(_buildGroupRowTD('TD', i));
     }
 
     // Adding a separator between TDs and TPs
     rows.add(Divider(thickness: 2, color: Colors.black));
 
     // Adding all TPs
-    for (int i = 1; i <= numberOfGroups; i++) {
-      rows.add(_buildGroupRow('TP', i));
-    }
+     for (int i = 1; i <= numberOfGroups; i++) {
+     rows.add(_buildGroupRowTP('TP', i));
+     }
 
     return SingleChildScrollView(
       child: Column(
@@ -1232,7 +1325,6 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
   Widget _buildEmptyRowWithLabel() {
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1247,29 +1339,28 @@ class _AdjointRep extends State<AdjointRep> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
             ),
-            ...List.generate(
-                courses.length,
-                (index) => Expanded(
-                      child: TextField(
-                        style: TextStyle(fontSize: 10),
-                        decoration: InputDecoration(
-                          hintText: '',
-                          hintStyle: TextStyle(fontSize: 10),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(vertical: 8.0),
-                          constraints: BoxConstraints(
-                            maxHeight:
-                                30, // Hauteur maximale du TextField réduite
-                          ),
-                        ),
+            ...List.generate(courses.length, (index) =>
+                Expanded(
+                  child: TextField(
+                    controller: emptyRowControllers[index],
+                    style: TextStyle(fontSize: 10),
+                    decoration: InputDecoration(
+                      hintText: '',
+                      hintStyle: TextStyle(fontSize: 10),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                      constraints: BoxConstraints(
+                        maxHeight:
+                        30, // Hauteur maximale du TextField réduite
                       ),
-                    )),
+                    ),
+                  ),
+                )),
           ],
         ),
       ),
     );
   }
-
   Widget _buildCoursesHeader() {
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1287,19 +1378,18 @@ class _AdjointRep extends State<AdjointRep> {
             ),
             ...courses
                 .map((course) => Expanded(
-                      child: Text(course,
-                          style: TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center),
-                    ))
+              child: Text(course,
+                  style: TextStyle(
+                      fontSize: 10, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center),
+            ))
                 .toList(),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildGroupRow(String type, int number) {
+  Widget _buildGroupRowTD(String type, int number) {
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 0.2),
@@ -1314,29 +1404,63 @@ class _AdjointRep extends State<AdjointRep> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
             ),
-            ...List.generate(
-                courses.length,
-                (index) => Expanded(
-                      child: TextField(
-                        style: TextStyle(fontSize: 10),
-                        decoration: InputDecoration(
-                          hintText: '',
-                          hintStyle: TextStyle(fontSize: 10),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(vertical: 8.0),
-                          constraints: BoxConstraints(
-                            maxHeight:
-                                30, // Hauteur maximale du TextField réduite
-                          ),
-                        ),
+            ...List.generate(courses.length, (index) => Expanded(
+                  child: TextField(
+                    controller: groupControllersTD[number - 1][index],
+                    style: TextStyle(fontSize: 10),
+                    decoration: InputDecoration(
+                      hintText: '',
+                      hintStyle: TextStyle(fontSize: 10),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                      constraints: BoxConstraints(
+                        maxHeight:
+                        30, // Hauteur maximale du TextField réduite
                       ),
-                    )),
+                    ),
+                  ),
+                )),
           ],
         ),
       ),
     );
   }
-
+  Widget _buildGroupRowTP(String type, int number) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black, width: 0.2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: Text('$type$number',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
+            ),
+            ...List.generate(courses.length, (index) => Expanded(
+              child: TextField(
+                controller: groupControllersTP[number - 1][index],
+                style: TextStyle(fontSize: 10),
+                decoration: InputDecoration(
+                  hintText: '',
+                  hintStyle: TextStyle(fontSize: 10),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                  constraints: BoxConstraints(
+                    maxHeight:
+                    30, // Hauteur maximale du TextField réduite
+                  ),
+                ),
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
   void _updateCourses(String selectedParcours, String selectedSemestre) {
     // Define course lists for each year and semester
     if (selectedParcours == 'L1') {

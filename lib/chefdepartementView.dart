@@ -299,7 +299,6 @@ class _chefdepartementView extends State<chefdepartementView>
               style: TextStyle(color: Colors.white),
             ),
             showBadge: unreadMessages > 0,
-            badgeColor: Colors.red,
             position: BadgePosition.topEnd(top: 0, end: 3),
             child: FloatingActionButton(
               onPressed: () {

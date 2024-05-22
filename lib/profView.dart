@@ -69,8 +69,7 @@ class _MainUserweb extends State<MainUserweb> {
     }
   }
 
-  List<ModuleState> moduleStates = List.generate(
-      3,
+  List<ModuleState> moduleStates = List.generate(3,
       (index) => ModuleState(
             moduleController: TextEditingController(),
             parcoursController: TextEditingController(),
@@ -81,7 +80,6 @@ class _MainUserweb extends State<MainUserweb> {
             moduleController: TextEditingController(),
             parcoursController: TextEditingController(),
           ));
-
   void _showGradeDialog(BuildContext context) {
     String? selectedGrade = "Chef de département"; // Default initial value
 
@@ -164,7 +162,6 @@ class _MainUserweb extends State<MainUserweb> {
       },
     );
   }
-
   Future<void> saveData(String userId) async {
     List<Map<String, dynamic>> modules = moduleStates.map((ModuleState state) {
       return {
@@ -191,7 +188,6 @@ class _MainUserweb extends State<MainUserweb> {
       "valide": "true",
     });
   }
-
   Future<void> saveData2(String userId) async {
     List<Map<String, dynamic>> modules =
         moduleStates2.map((ModuleState state2) {
@@ -292,8 +288,7 @@ class _MainUserweb extends State<MainUserweb> {
                   }
 
                   var userDoc = snapshot.data;
-                  var valeur = userDoc?['valide'] ??
-                      'null'; // Defaulting to 'null' if the key does not exist
+                  String valeur = userDoc!['valide'] ; // Defaulting to 'null' if the key does not exist
 
                   if (valeur == 'null') {
                     return Align(
@@ -532,8 +527,9 @@ class _MainUserweb extends State<MainUserweb> {
                                                   contentPadding:
                                                       const EdgeInsets.all(10),
                                                   hintText: '${index + 1}:',
-                                                  border:
-                                                      const OutlineInputBorder(),
+                                                  border: state.moduleController.text.isEmpty
+                                                      ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                      : OutlineInputBorder(),
                                                 ),
                                               ),
                                             ),
@@ -543,11 +539,13 @@ class _MainUserweb extends State<MainUserweb> {
                                             child: TextField(
                                               controller:
                                                   state.parcoursController,
-                                              decoration: const InputDecoration(
+                                              decoration:  InputDecoration(
                                                 isDense: true,
                                                 contentPadding:
                                                     EdgeInsets.all(10),
-                                                border: OutlineInputBorder(),
+                                                border: state.parcoursController.text.isEmpty
+                                                    ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                    : OutlineInputBorder(),
                                               ),
                                             ),
                                           ),
@@ -790,14 +788,15 @@ class _MainUserweb extends State<MainUserweb> {
                                             height: 30,
                                             child: TextField(
                                               controller:
-                                                  state2.moduleController,
+                                              state2.moduleController,
                                               decoration: InputDecoration(
                                                 isDense: true,
                                                 contentPadding:
                                                     const EdgeInsets.all(10),
                                                 hintText: '${index + 1}:',
-                                                border:
-                                                    const OutlineInputBorder(),
+                                                border: state2.moduleController.text.isEmpty
+                                                    ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                    : OutlineInputBorder(),
                                               ),
                                             ),
                                           ),
@@ -806,11 +805,13 @@ class _MainUserweb extends State<MainUserweb> {
                                             child: TextField(
                                               controller:
                                                   state2.parcoursController,
-                                              decoration: const InputDecoration(
+                                              decoration: InputDecoration(
                                                 isDense: true,
                                                 contentPadding:
                                                     EdgeInsets.all(10),
-                                                border: OutlineInputBorder(),
+                                                border: state2.parcoursController.text.isEmpty
+                                                    ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                    : OutlineInputBorder(),
                                               ),
                                             ),
                                           ),
@@ -887,16 +888,7 @@ class _MainUserweb extends State<MainUserweb> {
                                 width: 100,
                                 child: MaterialButton(
                                   onPressed: () async {
-                                    FirebaseFirestore db =
-                                        FirebaseFirestore.instance;
-                                    var docRef =
-                                        db.collection('users').doc(iduserweb);
-                                    await docRef.update({
-                                      'valide':
-                                          'true' // Met à jour le champ `valide` à true
-                                    }).catchError((error) {});
-                                    await saveData(iduserweb);
-                                    await saveData2(iduserweb);
+                                    saveDataToFirebase(widget.iduserweb);
                                   },
                                   color: Colors.green, // Couleur du bouton
                                   textColor: Colors.white, // Couleur du texte
@@ -965,6 +957,44 @@ class _MainUserweb extends State<MainUserweb> {
         ),
       ),
     );
+  }
+  bool validateFields(List<ModuleState> moduleStates) {
+    bool allValid = true;
+    for (var state in moduleStates) {
+      if (state.moduleController.text.isEmpty || state.parcoursController.text.isEmpty) {
+        allValid = false;
+        break;
+      }
+    }
+    return allValid;
+  }
+  void saveDataToFirebase(String iduserweb) async {
+    if (validateFields(moduleStates) && validateFields(moduleStates2)) {
+      FirebaseFirestore db = FirebaseFirestore.instance;
+      var docRef = db.collection('users').doc(iduserweb);
+
+      // Mise à jour des données si les champs sont valides.
+      await docRef.update({
+        'valide': 'true',
+      }).catchError((error) {});
+
+      // Sauvegarde des données.
+      await saveData(iduserweb);
+      await saveData2(iduserweb);
+    } else {
+      // Si la validation échoue, affichez une Snackbar avec un message d'erreur.
+      showSnackbarMessage('Vous devez remplir tous les champs nécessaires.');
+    }
+  }
+
+  void showSnackbarMessage(String message) {
+    final snackBar = SnackBar(
+      content: Text(message),
+      duration: Duration(seconds: 3),
+      backgroundColor: Colors.red,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 }
 
