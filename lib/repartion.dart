@@ -186,6 +186,27 @@ class _AdjointRep extends State<AdjointRep> {
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     final int anneeActuelle = DateTime.now().year;
 
+    for (int i = 0; i < emptyRowControllers.length; i++) {
+      final module = courses[i];
+      final contenu = emptyRowControllers[i].text;
+      if(module.isNotEmpty){
+        await firestore
+            .collection('repartition')
+            .doc(anneeActuelle.toString())
+            .collection(selectedParcours!)
+            .doc(selectedSemestre!)
+            .collection('Cours')
+            .add({
+          'prof': contenu,
+          'module': module,
+          'parcours': selectedParcours,
+          'semestre': selectedSemestre!,
+          'type' : 'Cours',
+        });
+      }
+
+    }
+
     // Boucle à travers les groupes TD
     for (int i = 0; i < groupControllersTD.length; i++) {
       final numeroGroupe = i + 1;

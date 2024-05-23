@@ -179,7 +179,7 @@ class _chefdepartementView extends State<chefdepartementView>
   Future<void> _saveDates() async {
     // Créer une nouvelle référence de document avec un ID généré automatiquement
     DocumentReference docRef =
-        FirebaseFirestore.instance.collection('dates').doc();
+    FirebaseFirestore.instance.collection('dates').doc();
 
     // Ajouter les dates avec l'ID du document dans le même document
     await docRef.set({
@@ -189,14 +189,17 @@ class _chefdepartementView extends State<chefdepartementView>
       'timestamp': FieldValue.serverTimestamp(),
     });
 
-    // Récupérer tous les documents de la collection 'users'
-    var snapshot = await FirebaseFirestore.instance.collection('users').get();
+    // Récupérer tous les documents de la collection 'users' où le champ 'statu' n'est pas égal à 'valide'
+    var snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('statu', isNotEqualTo: 'valider')
+        .get();
 
     // Mettre à jour le champ 'status' pour chaque utilisateur
     for (var doc in snapshot.docs) {
       await doc.reference.update({
         'statu': 'en attente',
-        'valide': 'false',
+        'valide': false,
       });
     }
   }
