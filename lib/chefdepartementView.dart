@@ -1,10 +1,16 @@
+import 'dart:convert';
+
 import 'package:badges/badges.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:timeline_tile/timeline_tile.dart';
-import 'package:badges/badges.dart' as badges; // Alias for the external badges package
+import 'package:badges/badges.dart'
+    as badges; // Alias for the external badges package
 import 'main.dart';
+import 'package:http/http.dart' as http;
 
 class chefdepartementView extends StatefulWidget {
   String idchefdepartement;
@@ -179,7 +185,7 @@ class _chefdepartementView extends State<chefdepartementView>
   Future<void> _saveDates() async {
     // Créer une nouvelle référence de document avec un ID généré automatiquement
     DocumentReference docRef =
-    FirebaseFirestore.instance.collection('dates').doc();
+        FirebaseFirestore.instance.collection('dates').doc();
 
     // Ajouter les dates avec l'ID du document dans le même document
     await docRef.set({
@@ -206,11 +212,93 @@ class _chefdepartementView extends State<chefdepartementView>
 
   final TextEditingController _messageController = TextEditingController();
 
+  // Déplacer l'inscription et créer un utilisateur
+  void _validerInscription(String documentId, Map<String, dynamic> data) async {
+    try {
+      String email = "${data['nom']}${data['prenom']}@matierelink.com"
+          .toLowerCase()
+          .replaceAll(' ', '');
+      String password = "${DateTime.now().year}${data['nom']}";
 
+      // Créer l'utilisateur dans FirebaseAuth
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      // Ajouter l'utilisateur à la collection 'users' avec l'UID comme ID du document
+      String uid = userCredential.user!.uid;
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        ...data, // Importer toutes les données de l'inscription
+        'uid': uid // Sauvegarder également l'UID dans le document
+      });
+
+      // Supprimer l'inscription de la collection 'inscriptions'
+      await FirebaseFirestore.instance
+          .collection('inscriptions')
+          .doc(documentId)
+          .delete();
+
+      _showLongToast("Inscription validée et utilisateur créé");
+    } catch (e) {
+      _showLongToast("Erreur: ${e.toString()}");
+    }
+  }
+
+  void _showLongToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_LONG, // Durée par défaut d'environ 3-5 secondes
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.green,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+
+    // Attendre 30 secondes avant d'annuler le toast
+    Future.delayed(Duration(seconds: 35), () {
+      Fluttertoast.cancel();
+    });
+  }
+
+  Future<void> sendValidationEmail(Map<String, dynamic> doc) async {
+    String toEmail = "${doc['nom']}${doc['prenom']}@matierelink.com"
+        .toLowerCase()
+        .replaceAll(' ', '');
+    String topassword = "${DateTime.now().year}${doc['nom']}";
+
+    final service_id = 'service_qjck4f1';
+    final template_id = 'template_s2hndwe';
+    final user_id = 'sbG2M-XWbWJeQmgYu';
+    final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'service_id': service_id,
+        'template_id': template_id,
+        'user_id': user_id,
+        'template_params': {
+          'user_subject': "Validation de l'inscription",
+          'to_name': doc['nom'],
+          'user_message': "email : $toEmail \n mot de passe : $topassword",
+          'to_email': doc['email'],
+          'user_email': "manelbensalah95@gmail.com",
+        }
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      // Handle successful email sending
+      print("Email sent successfully!");
+    } else {
+      // Handle errors
+      print("Failed to send email. Status code: ${response.statusCode}");
+    }
+  }
 
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       setState(() {
         _selectedTabIndex =
@@ -255,46 +343,24 @@ class _chefdepartementView extends State<chefdepartementView>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 5,
         title: Text('Chef departement',
             style:
                 TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: MaterialButton(
-              color: Colors.black87,
-              textColor: Colors.white,
-              onPressed: () async {
-                Navigator.push(
-                    context, MaterialPageRoute(builder: (context) => MyApp()));
-              },
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize
-                    .min, // Use MainAxisSize.min to wrap content within the button
-                children: <Widget>[
-                  Icon(Icons.logout, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Sign Out'),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
       floatingActionButton: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('messages')
-            .where('userId', isEqualTo: "adjoint") // Assuming 'adjoint' is the chief's user ID
+            .where('userId',
+                isEqualTo:
+                    "adjoint") // Assuming 'adjoint' is the chief's user ID
             .where('isRead', isEqualTo: false)
             .snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          int unreadMessages = snapshot.hasData ? snapshot.data!.docs.length : 0;
+          int unreadMessages =
+              snapshot.hasData ? snapshot.data!.docs.length : 0;
 
           return badges.Badge(
             badgeContent: Text(
@@ -305,7 +371,8 @@ class _chefdepartementView extends State<chefdepartementView>
             position: BadgePosition.topEnd(top: 0, end: 3),
             child: FloatingActionButton(
               onPressed: () {
-                markMessagesAsRead('adjoint'); // Mark the messages as read when the dialog is opened
+                markMessagesAsRead(
+                    'adjoint'); // Mark the messages as read when the dialog is opened
                 showDialog(
                   context: context,
                   builder: (context) => buildChatDialog(context),
@@ -340,8 +407,11 @@ class _chefdepartementView extends State<chefdepartementView>
                 labelPadding: const EdgeInsets.only(left: 20, right: 20),
                 unselectedLabelColor: Colors.grey,
                 tabs: [
+                  Tab(
+                    text: "Répartion",
+                  ),
+                  Tab(text: "Valider Inscription"),
                   Tab(text: "Enseigants"),
-                  Tab(text: "Répartion",)
                 ],
               ),
             ),
@@ -351,79 +421,6 @@ class _chefdepartementView extends State<chefdepartementView>
                 physics: NeverScrollableScrollPhysics(),
                 children: [
                   //PREMIER TAB
-                  isLoading
-                      ? Center(child: CircularProgressIndicator())
-                      : Column(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(8.0),
-                              child: TextField(
-                                controller: searchController,
-                                decoration: InputDecoration(
-                                  prefixIcon:
-                                      Icon(Icons.search, color: Colors.grey),
-                                  hintText: 'Search',
-                                  hintStyle:
-                                      TextStyle(color: Colors.grey.shade500),
-                                  floatingLabelBehavior:
-                                      FloatingLabelBehavior.never,
-                                  border: UnderlineInputBorder(
-                                    borderSide: BorderSide(
-                                        color: Colors.grey.shade100,
-                                        width: 2.0),
-                                  ),
-                                ),
-                                onChanged: (value) => setState(() {}),
-                              ),
-                            ),
-                            Expanded(
-                                child: Card(
-                                    margin: EdgeInsets.all(20),
-                                    child: StreamBuilder<QuerySnapshot>(
-                                      stream: FirebaseFirestore.instance
-                                          .collection('users')
-                                          .orderBy('timestamp',
-                                              descending: true)
-                                          .snapshots(),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.hasError)
-                                          return Text(
-                                              'Error: ${snapshot.error}');
-                                        switch (snapshot.connectionState) {
-                                          case ConnectionState.waiting:
-                                            return Center(
-                                                child:
-                                                    CircularProgressIndicator());
-                                          default:
-                                            List<Map<String, dynamic>> users =
-                                                snapshot.data!.docs.map(
-                                                    (DocumentSnapshot
-                                                        document) {
-                                              return document.data()
-                                                  as Map<String, dynamic>;
-                                            }).toList();
-                                            // Filter users based on search query
-                                            if (searchController
-                                                .text.isNotEmpty) {
-                                              users = users.where((user) {
-                                                return user['displayName']
-                                                    .toString()
-                                                    .toLowerCase()
-                                                    .contains(searchController
-                                                        .text
-                                                        .toLowerCase());
-                                              }).toList();
-                                            }
-                                            return buildUsersTable(
-                                                users); // Call the function with the list of filtered users
-                                        }
-                                      },
-                                    ))),
-                          ],
-                        ),
-
-
-                  //DEUXIME TAB
                   Column(
                     children: [
                       Padding(
@@ -675,6 +672,148 @@ class _chefdepartementView extends State<chefdepartementView>
                       )
                     ],
                   ),
+                  //DEUXI2ME TAB
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('inscriptions').snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) return Text('Erreur: ${snapshot.error}');
+              if (snapshot.connectionState == ConnectionState.waiting) return Center(child: CircularProgressIndicator());
+              final data = snapshot.requireData;
+
+              return ListView.separated(
+                itemCount: data.size,
+                separatorBuilder: (context, index) => Divider(
+                  thickness: 1,
+                  indent: 15,
+                  endIndent: 15,
+                ),
+                itemBuilder: (context, index) {
+                  var doc = data.docs[index];
+                  return Card(
+                    margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                    child: ListTile(
+                      contentPadding: EdgeInsets.all(15),
+                      title: Text(
+                        "${doc['nom']} ${doc['prenom']}",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 10),
+                          Text(
+                            "Email: ${doc['email']}",
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          SizedBox(height: 5),
+                          Text(
+                            "Grade: ${doc['grade']}",
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          SizedBox(height: 5),
+                          Text(
+                            "Fonction: ${doc['fonction']}",
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      trailing: ElevatedButton(
+                        onPressed: () async {
+                          _validerInscription(doc.id, doc.data() as Map<String, dynamic>);
+                          await sendValidationEmail(doc.data() as Map<String, dynamic>);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          child: Text(
+                            'Valider Inscription',
+                            style: TextStyle(fontSize: 14, color: Colors.white),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          primary: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+
+          //TROISI2ME TAB
+                  isLoading
+                      ? Center(child: CircularProgressIndicator())
+                      : Column(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(8.0),
+                              child: TextField(
+                                controller: searchController,
+                                decoration: InputDecoration(
+                                  prefixIcon:
+                                      Icon(Icons.search, color: Colors.grey),
+                                  hintText: 'Search',
+                                  hintStyle:
+                                      TextStyle(color: Colors.grey.shade500),
+                                  floatingLabelBehavior:
+                                      FloatingLabelBehavior.never,
+                                  border: UnderlineInputBorder(
+                                    borderSide: BorderSide(
+                                        color: Colors.grey.shade100,
+                                        width: 2.0),
+                                  ),
+                                ),
+                                onChanged: (value) => setState(() {}),
+                              ),
+                            ),
+                            Expanded(
+                                child: Card(
+                                    margin: EdgeInsets.all(20),
+                                    child: StreamBuilder<QuerySnapshot>(
+                                      stream: FirebaseFirestore.instance
+                                          .collection('users')
+                                          .orderBy('timestamp',
+                                              descending: true)
+                                          .snapshots(),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasError)
+                                          return Text(
+                                              'Error: ${snapshot.error}');
+                                        switch (snapshot.connectionState) {
+                                          case ConnectionState.waiting:
+                                            return Center(
+                                                child:
+                                                    CircularProgressIndicator());
+                                          default:
+                                            List<Map<String, dynamic>> users =
+                                                snapshot.data!.docs.map(
+                                                    (DocumentSnapshot
+                                                        document) {
+                                              return document.data()
+                                                  as Map<String, dynamic>;
+                                            }).toList();
+                                            // Filter users based on search query
+                                            if (searchController
+                                                .text.isNotEmpty) {
+                                              users = users.where((user) {
+                                                return user['displayName']
+                                                    .toString()
+                                                    .toLowerCase()
+                                                    .contains(searchController
+                                                        .text
+                                                        .toLowerCase());
+                                              }).toList();
+                                            }
+                                            return buildUsersTable(
+                                                users); // Call the function with the list of filtered users
+                                        }
+                                      },
+                                    ))),
+                          ],
+                        ),
                 ],
               ),
             ),
@@ -684,9 +823,9 @@ class _chefdepartementView extends State<chefdepartementView>
     );
   }
 
-
   Widget buildChatDialog(BuildContext context) {
-    double width = MediaQuery.of(context).size.width * 0.4; // 40% de la largeur de l'écran
+    double width =
+        MediaQuery.of(context).size.width * 0.4; // 40% de la largeur de l'écran
 
     return Dialog(
       child: StatefulBuilder(
@@ -694,9 +833,11 @@ class _chefdepartementView extends State<chefdepartementView>
           return Container(
             color: Colors.white,
             width: width,
-            height: MediaQuery.of(context).size.height * 0.9, // 90% de la hauteur de l'écran
+            height: MediaQuery.of(context).size.height *
+                0.9, // 90% de la hauteur de l'écran
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start, // Aligner le texte à gauche
+              crossAxisAlignment:
+                  CrossAxisAlignment.start, // Aligner le texte à gauche
               children: [
                 Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -720,7 +861,9 @@ class _chefdepartementView extends State<chefdepartementView>
       ),
     );
   }
-  Widget buildInputField(BuildContext context, TextEditingController messageController, double width) {
+
+  Widget buildInputField(BuildContext context,
+      TextEditingController messageController, double width) {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Row(
@@ -741,12 +884,14 @@ class _chefdepartementView extends State<chefdepartementView>
           ),
           IconButton(
             icon: Icon(Icons.send),
-            onPressed: () => _sendMessage(messageController.text, idchefdepartement),
+            onPressed: () =>
+                _sendMessage(messageController.text, idchefdepartement),
           ),
         ],
       ),
     );
   }
+
   Widget buildMessageList(BuildContext context, double width) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -767,20 +912,26 @@ class _chefdepartementView extends State<chefdepartementView>
           itemCount: chatDocs.length,
           itemBuilder: (ctx, index) {
             var message = chatDocs[index];
-            var isMe = message['userId'] == idchefdepartement; // Compare message userId with current user's ID
+            var isMe = message['userId'] ==
+                idchefdepartement; // Compare message userId with current user's ID
             var messageTime = message['createdAt'] as Timestamp;
-            var formattedTime = DateFormat('HH:mm').format(messageTime.toDate());
+            var formattedTime =
+                DateFormat('HH:mm').format(messageTime.toDate());
 
             return Row(
-              mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              mainAxisAlignment:
+                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
               children: [
-                if (!isMe) Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: CircleAvatar(
-                    // You can display the sender's initials or an icon
-                    child: Text(message['userId'].substring(0, 1).toUpperCase()), // Display first letter of userId
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: CircleAvatar(
+                      // You can display the sender's initials or an icon
+                      child: Text(message['userId']
+                          .substring(0, 1)
+                          .toUpperCase()), // Display first letter of userId
+                    ),
                   ),
-                ),
                 ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: width * 0.7, // Maximum width for a message bubble
@@ -789,18 +940,21 @@ class _chefdepartementView extends State<chefdepartementView>
                     padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                     margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     decoration: BoxDecoration(
-                      color: isMe ? Colors.grey[100] : Colors.blue[300], // Different colors for sender/receiver
+                      color: isMe
+                          ? Colors.grey[100]
+                          : Colors.blue[
+                              300], // Different colors for sender/receiver
                       borderRadius: isMe
                           ? BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                        bottomLeft: Radius.circular(12),
-                      )
+                              topLeft: Radius.circular(12),
+                              topRight: Radius.circular(12),
+                              bottomLeft: Radius.circular(12),
+                            )
                           : BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                        bottomRight: Radius.circular(12),
-                      ),
+                              topLeft: Radius.circular(12),
+                              topRight: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -896,6 +1050,7 @@ class _chefdepartementView extends State<chefdepartementView>
       ],
     );
   }
+
   Widget statusWidget(String? status) {
     switch (status) {
       case "rien":
@@ -989,8 +1144,7 @@ class _navigation2 extends State<navigation2> {
               NavigationRailDestination(
                   icon: Icon(Icons.space_dashboard),
                   label: Text('Boite de réception ')),
-              NavigationRailDestination(
-                  icon: Icon(Icons.add), label: Text('Historique')),
+              NavigationRailDestination(icon: Icon(Icons.add), label: Text('Historique')),
             ],
 
             // Called when one tab is selected
@@ -1007,6 +1161,39 @@ class _navigation2 extends State<navigation2> {
                 ),
                 const SizedBox(
                   height: 40,
+                ),
+              ],
+            ),
+            trailing:
+
+            Column(
+              children: [
+                SizedBox(
+                  height: 150,
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: MaterialButton(
+                    color: Colors.redAccent,
+                    textColor: Colors.white,
+                    onPressed: () async {
+                      Navigator.push(context,
+                          MaterialPageRoute(builder: (context) => MyApp()));
+                    },
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize
+                          .min, // Use MainAxisSize.min to wrap content within the button
+                      children: <Widget>[
+                        Icon(Icons.logout, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text('Sign Out'),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled4/repartion.dart';
+import 'Insciption.dart';
 import 'nagivateuradjoint.dart';
 import 'chefdepartementView.dart';
 import 'navigationprof.dart';
@@ -109,19 +110,42 @@ class _LoginFormState extends State<LoginForm> {
   Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+
       if (_email == "chefdepartement@gmail.com" && _password == "chef2024") {
         Navigator.push(
           context,
-          MaterialPageRoute(
-              builder: (context) => navigation2(idnavigateur: "chef")),
+          MaterialPageRoute(builder: (context) => navigation2(idnavigateur: "chef")),
         );
-      } else if (_email == "adjointdepartement@gmail.com" &&
-          _password == "adjoint2024") {
+      } else if (_email == "adjointdepartement@gmail.com" && _password == "adjoint2024") {
         Navigator.push(
           context,
-          MaterialPageRoute(
-              builder: (context) => navigationadjoint(idnavigateur: "adjoint")),
+          MaterialPageRoute(builder: (context) => navigationadjoint(idnavigateur: "adjoint")),
         );
+      } else {
+        try {
+          // Tenter de se connecter avec FirebaseAuth
+          UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: _email,
+            password: _password,
+          );
+
+          // Connecté avec succès, naviguer vers une page d'accueil par exemple
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => navigation(idnavigateur: userCredential.user!.uid,)),
+          );
+        } catch (e) {
+          // Afficher un message d'erreur en cas de problème de connexion
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Erreur de connexion : ${e.toString()}'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 30),
+              )
+          );
+        }
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        prefs.setBool("auth", true);
       }
       print('Email: $_email, Password: $_password');
     }
@@ -200,9 +224,9 @@ class _LoginFormState extends State<LoginForm> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          Positioned(
+          Positioned.fill(
             right: MediaQuery.of(context).size.width * 0.50,
-            child: Image.asset("assets/jj.png", fit: BoxFit.cover),
+            child: Image.asset("assets/jj.png", fit: BoxFit.fill),
           ),
           Positioned(
             top: 0,
@@ -267,73 +291,110 @@ class _LoginFormState extends State<LoginForm> {
                               style: TextStyle(color: Colors.blueGrey),
                             )),
                         SizedBox(height: 60),
-                        TextFormField(
-                          focusNode: _emailFocusNode,
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            labelStyle: TextStyle(
-                              fontSize:
-                                  12, // Set the font size smaller as needed
-                              // Optional: You can also change the color
+                        SizedBox(
+                          width: MediaQuery.of(context).size.width * 0.45,
+                          child: TextFormField(
+                            focusNode: _emailFocusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              labelStyle: TextStyle(
+                                fontSize:
+                                    12, // Set the font size smaller as needed
+                                // Optional: You can also change the color
+                              ),
+                              prefixIcon: Icon(
+                                Icons.email,
+                                size: 15,
+                                color:
+                                    _isEmailFocused ? Colors.purple : Colors.grey,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(0),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.purple),
+                              ),
                             ),
-                            prefixIcon: Icon(
-                              Icons.email,
-                              size: 15,
-                              color:
-                                  _isEmailFocused ? Colors.purple : Colors.grey,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(0),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: Colors.purple),
-                            ),
+                            validator: (value) {
+                              if (value!.isEmpty || !value.contains('@')) {
+                                return "Veuillez entrer un email valide.";
+                              }
+                              return null;
+                            },
+                            onSaved: (value) => _email = value!,
                           ),
-                          validator: (value) {
-                            if (value!.isEmpty || !value.contains('@')) {
-                              return "Veuillez entrer un email valide.";
-                            }
-                            return null;
-                          },
-                          onSaved: (value) => _email = value!,
                         ),
                         SizedBox(height: 20),
-                        TextFormField(
-                          focusNode: _passwordFocusNode,
-                          decoration: InputDecoration(
-                            labelText: 'Mot de passe',
-                            labelStyle: TextStyle(
-                              fontSize:
-                                  12, // Set the font size smaller as needed
-                              // Optional: You can also change the color
+                        SizedBox(
+                          width: MediaQuery.of(context).size.width * 0.45,
+                          child: TextFormField(
+                            focusNode: _passwordFocusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Mot de passe',
+                              labelStyle: TextStyle(
+                                fontSize:
+                                    12, // Set the font size smaller as needed
+                                // Optional: You can also change the color
+                              ),
+                              prefixIcon: Icon(
+                                Icons.lock,
+                                size: 15,
+                                color: _isPasswordFocused
+                                    ? Colors.purple
+                                    : Colors.grey,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(0),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.purple),
+                              ),
                             ),
-                            prefixIcon: Icon(
-                              Icons.lock,
-                              size: 15,
-                              color: _isPasswordFocused
-                                  ? Colors.purple
-                                  : Colors.grey,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(0),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: Colors.purple),
-                            ),
+                            obscureText: true,
+                            validator: (value) {
+                              if (value!.isEmpty || value.length < 6) {
+                                return "Le mot de passe doit contenir au moins 6 caractères.";
+                              }
+                              return null;
+                            },
+                            onSaved: (value) => _password = value!,
                           ),
-                          obscureText: true,
-                          validator: (value) {
-                            if (value!.isEmpty || value.length < 6) {
-                              return "Le mot de passe doit contenir au moins 6 caractères.";
-                            }
-                            return null;
-                          },
-                          onSaved: (value) => _password = value!,
                         ),
                         SizedBox(height: 30),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
+
+                            Container(
+                              width: MediaQuery.of(context).size.width * 0.15,
+                              height: MediaQuery.of(context).size.height * 0.07,
+                              child: TextButton(
+                                onPressed: (){
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (context) => Inscription1Form()),
+                                  );
+                                },
+                                child: Expanded(
+                                  child: Text(
+                                    'Nouveau utilisateur? Inscription',
+                                    style: TextStyle(
+                                      color: Colors.pink,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  minimumSize: Size(double.infinity, 50),
+                                  primary: Colors.transparent,
+                                ),
+                              ),
+                            ),
                             Container(
                               width: MediaQuery.of(context).size.width * 0.15,
                               height: MediaQuery.of(context).size.height * 0.07,
@@ -356,7 +417,7 @@ class _LoginFormState extends State<LoginForm> {
                                 ),
                               ),
                             ),
-                            ElevatedButton.icon(
+                            /*ElevatedButton.icon(
                               icon: Image.asset(
                                 'assets/google.png',
                                 height: 24.0, // Adjust the size accordingly
@@ -376,7 +437,7 @@ class _LoginFormState extends State<LoginForm> {
                                 padding: EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 8),
                               ),
-                            ),
+                            ),*/
                           ],
                         ),
                       ],
