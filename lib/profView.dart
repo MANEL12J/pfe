@@ -186,6 +186,7 @@ class _MainUserweb extends State<MainUserweb> {
 
     await userDocRef2.update({
       "valide": "true",
+      "statu" : "valider"
     });
   }
   Future<void> saveData2(String userId) async {
@@ -213,6 +214,7 @@ class _MainUserweb extends State<MainUserweb> {
 
     await userDocRef2.update({
       "valide": "true",
+       "statu" : "valider"
     });
   }
 
@@ -958,6 +960,7 @@ class _MainUserweb extends State<MainUserweb> {
       ),
     );
   }
+  // pas utilisé
   bool validateFields(List<ModuleState> moduleStates) {
     bool allValid = true;
     for (var state in moduleStates) {
@@ -968,23 +971,21 @@ class _MainUserweb extends State<MainUserweb> {
     }
     return allValid;
   }
+  // UTILIS2
   void saveDataToFirebase(String iduserweb) async {
-    if (validateFields(moduleStates) && validateFields(moduleStates2)) {
       FirebaseFirestore db = FirebaseFirestore.instance;
       var docRef = db.collection('users').doc(iduserweb);
 
       // Mise à jour des données si les champs sont valides.
       await docRef.update({
         'valide': 'true',
+        'statu' : 'valider'
       }).catchError((error) {});
 
       // Sauvegarde des données.
       await saveData(iduserweb);
       await saveData2(iduserweb);
-    } else {
-      // Si la validation échoue, affichez une Snackbar avec un message d'erreur.
-      showSnackbarMessage('Vous devez remplir tous les champs nécessaires.');
-    }
+
   }
 
   void showSnackbarMessage(String message) {
