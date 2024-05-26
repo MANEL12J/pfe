@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'historiqueprof.dart';
 import 'main.dart';
 import 'profView.dart';
 import 'chefdepartementView.dart';
@@ -49,7 +50,7 @@ class _navigationState extends State<navigation> {
       case 0:
         return MainUserweb(iduserweb: idnavigateur);
       case 1:
-        return MainUserweb(iduserweb: idnavigateur);
+        return ProfessorHomePage( userId: idnavigateur,);
       default:
         return Center(child: Text('Error'));
     }

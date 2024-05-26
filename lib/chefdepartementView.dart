@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:timeline_tile/timeline_tile.dart';
-import 'package:badges/badges.dart' as badges; // Alias for the external badges package
+import 'package:badges/badges.dart'
+    as badges; // Alias for the external badges package
 import 'main.dart';
 import 'package:http/http.dart' as http;
 
@@ -27,16 +28,78 @@ class _chefdepartementView extends State<chefdepartementView>
   Color primary = const Color(0xffEFEDF5);
   late TabController _tabController;
   int _selectedTabIndex = 0;
+  String buttonText = "Valider la répartition";
+  Color buttonColor = Colors.redAccent;
 
   List<String> columnNames = [];
   List sug = [];
   List users2 = [];
+  final String documentId = DateTime.now().year.toString();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  bool isClicked = false;
+  Future<void> checkRepartitionStatus() async {
+    try {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('repartition')
+          .doc(currentYear.toString()) // Replace with the actual document ID for the current year
+          .get();
+
+      if (doc.exists) {
+        String status = doc['valide'];
+        setState(() {
+          if (status == 'true') {
+            isClicked = true;
+            buttonColor = Colors.blueGrey;
+            buttonText = "Répartition validée";
+          } else if (status == 'en attente') {
+            isClicked = false;
+            buttonColor = Colors.redAccent;
+            buttonText = "Valider la répartition";
+          }
+        });
+      }
+    } catch (e) {
+      print("Error checking repartition status: $e");
+    }
+  }
+
+  Future<void> validateRepartition(
+      String documentId, BuildContext context) async {
+    await FirebaseFirestore.instance
+        .collection('repartition')
+        .doc(documentId)
+        .update({'valide': 'true'}).then((_) {
+      setState(() {
+        isClicked = true;
+        buttonColor = Colors.blueGrey;
+        buttonText = "Répartition validée";
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text("Répartition globale validée et envoyée aux enseignants."),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Erreur lors de la validation : $error"),
+          duration: Duration(seconds: 10),
+        ),
+      );
+    });
+  }
 
   Stream<DocumentSnapshot> _getValidationStatus() {
     final int currentYear = DateTime.now().year;
-    return firestore.collection('repartition').doc(currentYear.toString()).snapshots();
+
+    return firestore
+        .collection('repartition')
+        .doc(currentYear.toString())
+        .snapshots();
   }
+
   TextEditingController searchController = TextEditingController();
   bool isLoading = true; // Ajouter cette ligne dans votre classe
   void getDate() async {
@@ -213,6 +276,7 @@ class _chefdepartementView extends State<chefdepartementView>
       });
     }
   }
+
   final TextEditingController _messageController = TextEditingController();
 
   // Déplacer l'inscription et créer un utilisateur
@@ -261,6 +325,7 @@ class _chefdepartementView extends State<chefdepartementView>
       Fluttertoast.cancel();
     });
   }
+
   Future<void> sendValidationEmail(Map<String, dynamic> doc) async {
     String toEmail = "${doc['nom']}${doc['prenom']}@matierelink.com"
         .toLowerCase()
@@ -308,6 +373,7 @@ class _chefdepartementView extends State<chefdepartementView>
       });
     });
     getDate();
+    checkRepartitionStatus();
   }
 
   void dispose() {
@@ -340,49 +406,10 @@ class _chefdepartementView extends State<chefdepartementView>
     });
   }
 
-  Future<Map<String, dynamic>> fetchData() async {
-    DocumentReference anneeRef = firestore.collection('repartition').doc(currentYear.toString());
-    Map<String, dynamic> repartitionData = {};
-
-    List<String> parcoursList = ['L1', 'L2', 'L3'];
-    List<String> semestreList = ['Semestre 1', 'Semestre 2'];
-
-    for (String parcours in parcoursList) {
-      repartitionData[parcours] = {};
-      for (String semestre in semestreList) {
-        var modules = _getModulesForParcoursSemestre(parcours, semestre);
-        repartitionData[parcours][semestre] = {};
-
-        for (String module in modules) {
-          repartitionData[parcours][semestre][module] = {'Cours': 'N/A', 'TD': 'N/A', 'TP': 'N/A'};
-          for (String type in ['Cours', 'TD', 'TP']) {
-            try {
-              var collectionRef = anneeRef.collection(parcours).doc(semestre).collection(type);
-              var snapshot = await collectionRef.where('module', isEqualTo: module).get();
-              var profs = snapshot.docs.isNotEmpty
-                  ? snapshot.docs.map((doc) => doc.data()['prof'] as String? ?? 'N/A').join(', ')
-                  : 'N/A';
-              repartitionData[parcours][semestre][module][type] = profs;
-            } catch (e) {
-              print("Error accessing Firestore for $type: $e");
-            }
-          }
-        }
-      }
-    }
-
-    return repartitionData;
-  }
-
-
-
-  final int currentYear = DateTime.now().year;
-
   @override
   Widget build(BuildContext context) {
-    final DocumentReference repartitionRef = firestore
-        .collection('repartition')
-        .doc(currentYear.toString());
+    final DocumentReference repartitionRef =
+        firestore.collection('repartition').doc(currentYear.toString());
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -396,7 +423,9 @@ class _chefdepartementView extends State<chefdepartementView>
       floatingActionButton: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('messages')
-            .where('userId', isEqualTo: "adjoint") // Assuming 'adjoint' is the chief's user ID
+            .where('userId',
+                isEqualTo:
+                    "adjoint") // Assuming 'adjoint' is the chief's user ID
             .where('isRead', isEqualTo: false)
             .snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
@@ -412,7 +441,8 @@ class _chefdepartementView extends State<chefdepartementView>
             position: BadgePosition.topEnd(top: 0, end: 3),
             child: FloatingActionButton(
               onPressed: () {
-                markMessagesAsRead('adjoint'); // Mark the messages as read when the dialog is opened
+                markMessagesAsRead(
+                    'adjoint'); // Mark the messages as read when the dialog is opened
                 showDialog(
                   context: context,
                   builder: (context) => buildChatDialog(context),
@@ -473,6 +503,25 @@ class _chefdepartementView extends State<chefdepartementView>
                               style: TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 23),
                             ),
+                            ElevatedButton(
+                              onPressed: isClicked
+                                  ? null
+                                  : () => validateRepartition(currentYear.toString(),
+                                      context), // Replace with the actual document ID for the current year
+                              child: Text(
+                                buttonText,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ButtonStyle(
+                                backgroundColor:
+                                    MaterialStateProperty.resolveWith<Color>(
+                                  (Set<MaterialState> states) => buttonColor,
+                                ),
+                              ),
+                            ),
                             ElevatedButton.icon(
                               onPressed: _openDatePickerDialog,
                               icon: Icon(
@@ -511,34 +560,75 @@ class _chefdepartementView extends State<chefdepartementView>
                               child: StreamBuilder<DocumentSnapshot>(
                                 stream: repartitionRef.snapshots(),
                                 builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return Center(child: CircularProgressIndicator());
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return Center(
+                                        child: CircularProgressIndicator());
                                   } else if (snapshot.hasError) {
-                                    return Center(child: Text("Erreur lors du chargement des données"));
-                                  } else if (!snapshot.hasData || !snapshot.data!.exists) {
-                                    return Center(child: Text("Aucune donnée disponible"));
+                                    return Center(
+                                        child: Text(
+                                            "Erreur lors du chargement des données"));
+                                  } else if (!snapshot.hasData ||
+                                      !snapshot.data!.exists) {
+                                    return Center(
+                                        child:
+                                            Text("Aucune donnée disponible"));
                                   }
 
-                                  var data = snapshot.data!.data() as Map<String, dynamic>;
+                                  var data = snapshot.data!.data()
+                                      as Map<String, dynamic>;
                                   String status = data['valide'] ?? 'non';
                                   switch (status) {
                                     case 'en attente':
-                                      return FutureBuilder<Map<String, dynamic>>(
+                                      return FutureBuilder<
+                                          Map<String, dynamic>>(
                                         future: fetchData(),
                                         builder: (context, snapshot) {
-                                          if (snapshot.connectionState == ConnectionState.waiting) {
-                                            return Center(child: CircularProgressIndicator());
+                                          if (snapshot.connectionState ==
+                                              ConnectionState.waiting) {
+                                            return Center(
+                                                child:
+                                                    CircularProgressIndicator());
                                           } else if (snapshot.hasError) {
-                                            return Text("Erreur lors de la récupération des données");
-                                          } else if (snapshot.hasData && snapshot.data != null) {
-                                            return buildRepartitionTable( context, snapshot.data!);
+                                            return Text(
+                                                "Erreur lors de la récupération des données");
+                                          } else if (snapshot.hasData &&
+                                              snapshot.data != null) {
+                                            return buildRepartitionTable(
+                                                context, snapshot.data!);
                                           } else {
-                                            return Text("Aucune répartition à afficher");
+                                            return Text(
+                                                "Aucune répartition à afficher");
+                                          }
+                                        },
+                                      );
+                                    case 'true':
+                                      return FutureBuilder<
+                                          Map<String, dynamic>>(
+                                        future: fetchData(),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.connectionState ==
+                                              ConnectionState.waiting) {
+                                            return Center(
+                                                child:
+                                                    CircularProgressIndicator());
+                                          } else if (snapshot.hasError) {
+                                            return Text(
+                                                "Erreur lors de la récupération des données");
+                                          } else if (snapshot.hasData &&
+                                              snapshot.data != null) {
+                                            return buildRepartitionTable(
+                                                context, snapshot.data!);
+                                          } else {
+                                            return Text(
+                                                "Aucune répartition à afficher");
                                           }
                                         },
                                       );
                                     default:
-                                      return Center(child: Text("Aucune répartition disponible pour l'instant"));
+                                      return Center(
+                                          child: Text(
+                                              "Aucune répartition disponible pour l'instant"));
                                   }
                                 },
                               ),
@@ -732,78 +822,90 @@ class _chefdepartementView extends State<chefdepartementView>
                     ],
                   ),
                   //DEUXI2ME TAB
-                     StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('inscriptions').snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) return Text('Erreur: ${snapshot.error}');
-              if (snapshot.connectionState == ConnectionState.waiting) return Center(child: CircularProgressIndicator());
-              final data = snapshot.requireData;
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('inscriptions')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError)
+                        return Text('Erreur: ${snapshot.error}');
+                      if (snapshot.connectionState == ConnectionState.waiting)
+                        return Center(child: CircularProgressIndicator());
+                      final data = snapshot.requireData;
 
-              return ListView.separated(
-                itemCount: data.size,
-                separatorBuilder: (context, index) => Divider(
-                  thickness: 1,
-                  indent: 15,
-                  endIndent: 15,
-                ),
-                itemBuilder: (context, index) {
-                  var doc = data.docs[index];
-                  return Card(
-                    margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.all(15),
-                      title: Text(
-                        "${doc['nom']} ${doc['prenom']}",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 10),
-                          Text(
-                            "Email: ${doc['email']}",
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          SizedBox(height: 5),
-                          Text(
-                            "Grade: ${doc['grade']}",
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          SizedBox(height: 5),
-                          Text(
-                            "Fonction: ${doc['fonction']}",
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      trailing: ElevatedButton(
-                        onPressed: () async {
-                          _validerInscription(doc.id, doc.data() as Map<String, dynamic>);
-                          await sendValidationEmail(doc.data() as Map<String, dynamic>);
+                      return ListView.separated(
+                        itemCount: data.size,
+                        separatorBuilder: (context, index) => Divider(
+                          thickness: 1,
+                          indent: 15,
+                          endIndent: 15,
+                        ),
+                        itemBuilder: (context, index) {
+                          var doc = data.docs[index];
+                          return Card(
+                            margin: EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 15),
+                            child: ListTile(
+                              contentPadding: EdgeInsets.all(15),
+                              title: Text(
+                                "${doc['nom']} ${doc['prenom']}",
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(height: 10),
+                                  Text(
+                                    "Email: ${doc['email']}",
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  SizedBox(height: 5),
+                                  Text(
+                                    "Grade: ${doc['grade']}",
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                  SizedBox(height: 5),
+                                  Text(
+                                    "Fonction: ${doc['fonction']}",
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                              trailing: ElevatedButton(
+                                onPressed: () async {
+                                  _validerInscription(doc.id,
+                                      doc.data() as Map<String, dynamic>);
+                                  await sendValidationEmail(
+                                      doc.data() as Map<String, dynamic>);
+                                },
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 15),
+                                  child: Text(
+                                    'Valider Inscription',
+                                    style: TextStyle(
+                                        fontSize: 14, color: Colors.white),
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  primary: Colors.blue,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          child: Text(
-                            'Valider Inscription',
-                            style: TextStyle(fontSize: 14, color: Colors.white),
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          primary: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
+                      );
+                    },
+                  ),
 
-          //TROISI2ME TAB
-                  isLoading ? Center(child: CircularProgressIndicator()) : Column(
+                  //TROISI2ME TAB
+                  isLoading
+                      ? Center(child: CircularProgressIndicator())
+                      : Column(
                           children: [
                             Container(
                               padding: EdgeInsets.all(8.0),
@@ -879,30 +981,110 @@ class _chefdepartementView extends State<chefdepartementView>
       ),
     );
   }
-  List<String> _getModulesForParcoursSemestre(String parcours, String semestre) {
+
+  final int currentYear = DateTime.now().year;
+  Future<Map<String, dynamic>> fetchData() async {
+    DocumentReference anneeRef =
+        firestore.collection('repartition').doc(currentYear.toString());
+    Map<String, dynamic> repartitionData = {};
+
+    List<String> parcoursList = ['L1', 'L2', 'L3'];
+    List<String> semestreList = ['Semestre 1', 'Semestre 2'];
+
+    for (String parcours in parcoursList) {
+      repartitionData[parcours] = {};
+      for (String semestre in semestreList) {
+        var modules = _getModulesForParcoursSemestre(parcours, semestre);
+        repartitionData[parcours][semestre] = {};
+
+        for (String module in modules) {
+          repartitionData[parcours][semestre]
+              [module] = {'Cours': 'N/A', 'TD': 'N/A', 'TP': 'N/A'};
+          for (String type in ['Cours', 'TD', 'TP']) {
+            try {
+              var collectionRef =
+                  anneeRef.collection(parcours).doc(semestre).collection(type);
+              var snapshot =
+                  await collectionRef.where('module', isEqualTo: module).get();
+              var profs = snapshot.docs.isNotEmpty
+                  ? snapshot.docs
+                      .map((doc) => doc.data()['prof'] as String? ?? 'N/A')
+                      .join(', ')
+                  : 'N/A';
+              repartitionData[parcours][semestre][module][type] = profs;
+            } catch (e) {
+              print("Error accessing Firestore for $type: $e");
+            }
+          }
+        }
+      }
+    }
+
+    return repartitionData;
+  }
+
+  List<String> _getModulesForParcoursSemestre(
+      String parcours, String semestre) {
     Map<String, Map<String, List<String>>> courses = {
       'L1': {
         'Semestre 1': [
-          'Analyse1', 'Algèbre 1', 'ASD', 'Structure Machine 1', 'Terminologie Scientifique', 'Langue Étrangère', 'Option (Physique / Mécanique du Point)'
+          'Analyse1',
+          'Algèbre 1',
+          'ASD',
+          'Structure Machine 1',
+          'Terminologie Scientifique',
+          'Langue Étrangère',
+          'Option (Physique / Mécanique du Point)'
         ],
         'Semestre 2': [
-          'Analyse2', 'Algèbre 2', 'ASD 2', 'Structure Machine 2', 'Proba/ statistique', 'Technologies de l\'information et communication', 'Option (Physique / Mécanique du Point)', 'Outills de programmation pour les mathématiques'
+          'Analyse2',
+          'Algèbre 2',
+          'ASD 2',
+          'Structure Machine 2',
+          'Proba/ statistique',
+          'Technologies de l\'information et communication',
+          'Option (Physique / Mécanique du Point)',
+          'Outills de programmation pour les mathématiques'
         ]
       },
       'L2': {
         'Semestre 1': [
-          'Architecture ordinateur', 'ASD3', 'THG', 'Système d\'information', 'Méthodes numériques', 'Logique mathématiques', 'Langue étrangère 2'
+          'Architecture ordinateur',
+          'ASD3',
+          'THG',
+          'Système d\'information',
+          'Méthodes numériques',
+          'Logique mathématiques',
+          'Langue étrangère 2'
         ],
         'Semestre 2': [
-          'THL', 'Système d\'exploitation 1', 'Base de données', 'Réseaux', 'Programmation orientée objet', 'Développement applications web', 'Langue étrangère 3'
+          'THL',
+          'Système d\'exploitation 1',
+          'Base de données',
+          'Réseaux',
+          'Programmation orientée objet',
+          'Développement applications web',
+          'Langue étrangère 3'
         ]
       },
       'L3': {
         'Semestre 1': [
-          'Système d\'exploitation 2', 'Compilation', 'IHM', 'Génie logiciel', 'Programmation linéaire', 'Probabilités et statistiques', 'Économie numérique'
+          'Système d\'exploitation 2',
+          'Compilation',
+          'IHM',
+          'Génie logiciel',
+          'Programmation linéaire',
+          'Probabilités et statistiques',
+          'Économie numérique'
         ],
         'Semestre 2': [
-          'Applications mobiles', 'Sécurité informatique', 'Intelligence artificielle', 'Données semi-structurées', 'Rédaction scientifique', 'Projet', 'Création et développement web'
+          'Applications mobiles',
+          'Sécurité informatique',
+          'Intelligence artificielle',
+          'Données semi-structurées',
+          'Rédaction scientifique',
+          'Projet',
+          'Création et développement web'
         ]
       }
     };
@@ -910,8 +1092,8 @@ class _chefdepartementView extends State<chefdepartementView>
     return courses[parcours]?[semestre] ?? [];
   }
 
-
-  Widget buildRepartitionTable(BuildContext context, Map<String, dynamic> repartitionData) {
+  Widget buildRepartitionTable(
+      BuildContext context, Map<String, dynamic> repartitionData) {
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
       child: Column(
@@ -922,40 +1104,56 @@ class _chefdepartementView extends State<chefdepartementView>
             children: [
               Padding(
                 padding: EdgeInsets.symmetric(vertical: 8.0),
-                child: Text(parcours, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+                child: Text(parcours,
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: repartitionData[parcours].keys.map<Widget>((semestre) {
+                children:
+                    repartitionData[parcours].keys.map<Widget>((semestre) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
                         padding: EdgeInsets.symmetric(vertical: 8.0),
-                        child: Text(semestre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        child: Text(semestre,
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18)),
                       ),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width),
+                          constraints: BoxConstraints(
+                              maxWidth: MediaQuery.of(context).size.width),
                           child: Table(
-                            border: TableBorder.all(color: Colors.grey, width: 1),
+                            border:
+                                TableBorder.all(color: Colors.grey, width: 1),
                             defaultColumnWidth: FixedColumnWidth(100.0),
                             children: [
                               TableRow(
-                                decoration: BoxDecoration(color: Colors.grey[300]),
+                                decoration:
+                                    BoxDecoration(color: Colors.grey[300]),
                                 children: [
                                   TableCell(
                                     child: Padding(
                                       padding: EdgeInsets.all(8.0),
-                                      child: Text('Modules', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                      child: Text('Modules',
+                                          style: TextStyle(
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.bold)),
                                     ),
                                   ),
-                                  ...repartitionData[parcours][semestre].keys.map((module) {
+                                  ...repartitionData[parcours][semestre]
+                                      .keys
+                                      .map((module) {
                                     return TableCell(
                                       child: Padding(
                                         padding: EdgeInsets.all(8.0),
-                                        child: Text(module, style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                        child: Text(module,
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontWeight: FontWeight.bold)),
                                       ),
                                     );
                                   }).toList(),
@@ -967,14 +1165,22 @@ class _chefdepartementView extends State<chefdepartementView>
                                     TableCell(
                                       child: Padding(
                                         padding: EdgeInsets.all(8.0),
-                                        child: Text(type, style: TextStyle(fontWeight: FontWeight.bold)),
+                                        child: Text(type,
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
                                       ),
                                     ),
-                                    ...repartitionData[parcours][semestre].keys.map((module) {
-                                      String cellValue = repartitionData[parcours][semestre][module][type];
+                                    ...repartitionData[parcours][semestre]
+                                        .keys
+                                        .map((module) {
+                                      String cellValue =
+                                          repartitionData[parcours][semestre]
+                                              [module][type];
                                       return TableCell(
                                         child: Container(
-                                          color: cellValue == 'N/A' ? Colors.orange[200] : null,
+                                          color: cellValue == 'N/A'
+                                              ? Colors.orange[200]
+                                              : null,
                                           padding: EdgeInsets.all(8.0),
                                           child: Text(cellValue),
                                         ),
@@ -1001,9 +1207,6 @@ class _chefdepartementView extends State<chefdepartementView>
       ),
     );
   }
-
-
-
 
   Widget buildChatDialog(BuildContext context) {
     double width =
@@ -1043,6 +1246,7 @@ class _chefdepartementView extends State<chefdepartementView>
       ),
     );
   }
+
   Widget buildInputField(BuildContext context,
       TextEditingController messageController, double width) {
     return Padding(
@@ -1273,7 +1477,6 @@ class _chefdepartementView extends State<chefdepartementView>
         return Container(); // Default case to handle unexpected status
     }
   }
-
 }
 
 class navigation2 extends StatefulWidget {
@@ -1282,6 +1485,7 @@ class navigation2 extends StatefulWidget {
   @override
   _navigation2 createState() => _navigation2(idnavigateur);
 }
+
 class _navigation2 extends State<navigation2> {
   String idnavigateur;
   int selectedindex = 0;
@@ -1325,7 +1529,8 @@ class _navigation2 extends State<navigation2> {
               NavigationRailDestination(
                   icon: Icon(Icons.space_dashboard),
                   label: Text('Boite de réception ')),
-              NavigationRailDestination(icon: Icon(Icons.add), label: Text('Historique')),
+              NavigationRailDestination(
+                  icon: Icon(Icons.add), label: Text('Historique')),
             ],
 
             // Called when one tab is selected
@@ -1345,9 +1550,7 @@ class _navigation2 extends State<navigation2> {
                 ),
               ],
             ),
-            trailing:
-
-            Column(
+            trailing: Column(
               children: [
                 SizedBox(
                   height: 150,
@@ -1385,5 +1588,4 @@ class _navigation2 extends State<navigation2> {
       ),
     );
   }
-
 }

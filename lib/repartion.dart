@@ -1,5 +1,6 @@
 import 'package:badges/badges.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:badges/badges.dart' as badges;
@@ -750,6 +751,31 @@ class _AdjointRep extends State<AdjointRep> {
                           ),
                         ),
                       ),
+                      SizedBox(width: 30,),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            showDialogWithRepartition(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            primary: Colors.pink,  // Bakground color
+                            padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
+                            textStyle: TextStyle(fontSize: 18),  // Bigger text
+                            minimumSize: Size(double.infinity, 100),  // Minimum size to be height 50
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5)  // Border radius
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.list , color: Colors.white,),
+                              SizedBox(width: 8),
+                              Text('Historique', style: TextStyle(fontSize: 18 , color: Colors.white)),  // Bigger text
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   )
 
@@ -793,6 +819,8 @@ class _AdjointRep extends State<AdjointRep> {
 
     );
   }
+
+
   Widget buildChatDialog(BuildContext context) {
     double width = MediaQuery.of(context).size.width *
         0.4; // Wider dialog for better readability
@@ -1694,8 +1722,217 @@ class _AdjointRep extends State<AdjointRep> {
 
 
 
-// This is a dummy function to mimic charge checking logic
+  Map<String, dynamic> repartitionData = {};
+  String selectedDocId = '';
+  Future<Map<String, dynamic>> fetchData(String documentId) async {
+    DocumentReference anneeRef = FirebaseFirestore.instance.collection('repartition').doc(documentId);
+    Map<String, dynamic> repartitionData = {};
 
+    List<String> parcoursList = ['L1', 'L2', 'L3'];
+    List<String> semestreList = ['Semestre 1', 'Semestre 2'];
+
+    for (String parcours in parcoursList) {
+      repartitionData[parcours] = {};
+      for (String semestre in semestreList) {
+        var modules = _getModulesForParcoursSemestre(parcours, semestre);
+        repartitionData[parcours][semestre] = {};
+
+        for (String module in modules) {
+          repartitionData[parcours][semestre][module] = {'Cours': 'N/A', 'TD': 'N/A', 'TP': 'N/A'};
+          for (String type in ['Cours', 'TD', 'TP']) {
+            try {
+              var collectionRef = anneeRef.collection(parcours).doc(semestre).collection(type);
+              var snapshot = await collectionRef.where('module', isEqualTo: module).get();
+              var profs = snapshot.docs.isNotEmpty
+                  ? snapshot.docs.map((doc) => doc.data()['prof'] as String? ?? 'N/A').join(', ')
+                  : 'N/A';
+              repartitionData[parcours][semestre][module][type] = profs;
+            } catch (e) {
+              print("Error accessing Firestore for $type: $e");
+            }
+          }
+        }
+      }
+    }
+
+    return repartitionData;
+  }
+  void showDialogWithRepartition(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.99,
+            height: MediaQuery.of(context).size.height * 0.95,
+            padding: EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Text(
+                  'Repartition Management',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                Divider(thickness: 2.0),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: FutureBuilder<QuerySnapshot>(
+                          future: FirebaseFirestore.instance.collection('repartition').get(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return Center(child: CircularProgressIndicator());
+                            }
+                            if (snapshot.hasError) {
+                              return Center(child: Text('Error: ${snapshot.error}'));
+                            }
+                            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                              return Center(child: Text('No documents found'));
+                            }
+
+                            var docs = snapshot.data!.docs;
+
+                            return ListView.builder(
+                              itemCount: docs.length,
+                              itemBuilder: (context, index) {
+                                var doc = docs[index];
+                                return ListTile(
+                                  title: Text('Répartition ${doc.id}'),
+                                  onTap: () {
+                                    // Ensure setState is called in a StatefulWidget
+                                    (context as Element).markNeedsBuild();
+                                    selectedDocId = doc.id;
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      VerticalDivider(thickness: 2.0),
+                      Expanded(
+                        flex: 5,
+                        child: selectedDocId.isEmpty
+                            ? Center(child: Text('Select a document to see details'))
+                            : FutureBuilder<Map<String, dynamic>>(
+                          future: fetchData(selectedDocId),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return Center(child: CircularProgressIndicator());
+                            }
+                            if (snapshot.hasError) {
+                              return Center(child: Text('Error: ${snapshot.error}'));
+                            }
+                            if (!snapshot.hasData) {
+                              return Center(child: Text('No data available'));
+                            }
+
+                            var repartitionData = snapshot.data!;
+                            return buildRepartitionTable(context, repartitionData);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  Widget buildRepartitionTable(BuildContext context, Map<String, dynamic> repartitionData) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: repartitionData.keys.map<Widget>((parcours) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(parcours, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: repartitionData[parcours].keys.map<Widget>((semestre) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(semestre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      ),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+                          child: Table(
+                            border: TableBorder.all(color: Colors.grey, width: 1),
+                            defaultColumnWidth: FixedColumnWidth(100.0),
+                            children: [
+                              TableRow(
+                                decoration: BoxDecoration(color: Colors.grey[300]),
+                                children: [
+                                  TableCell(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Text('Modules', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                  ...repartitionData[parcours][semestre].keys.map((module) {
+                                    return TableCell(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: Text(module, style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
+                              ...['Cours', 'TD', 'TP'].map((type) {
+                                return TableRow(
+                                  children: [
+                                    TableCell(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: Text(type, style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                                    ...repartitionData[parcours][semestre].keys.map((module) {
+                                      String cellValue = repartitionData[parcours][semestre][module][type];
+                                      return TableCell(
+                                        child: Container(
+                                          color: cellValue == 'N/A' ? Colors.orange[200] : null,
+                                          padding: EdgeInsets.all(8.0),
+                                          child: Text(cellValue),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+              Divider(thickness: 2.0, color: Colors.black),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
 
   Widget _buildCustomTable(String selectedParcours, String selectedSemestre, int numberOfGroups) {
     _valider((fn) { }, selectedParcours, selectedSemestre, groupeController);
