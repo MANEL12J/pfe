@@ -140,7 +140,7 @@ class _LoginFormState extends State<LoginForm> {
               SnackBar(
                 content: Text('Erreur de connexion : ${e.toString()}'),
                 backgroundColor: Colors.red,
-                duration: Duration(seconds: 30),
+                duration: Duration(seconds: 10),
               )
           );
         }

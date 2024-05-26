@@ -90,6 +90,8 @@ class _AdjointBoiteState extends State<AdjointBoite> {
           .collection('messagesadjointprof')
           .doc('chats')
           .collection('adjoint${user['uid']}')
+          .where('senderId', isEqualTo: '${user['uid']}')
+          .where('receiverId', isEqualTo: 'adjoint')
           .where('read', isEqualTo: false)
           .snapshots(),
       builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
@@ -142,7 +144,7 @@ class _ChatPageState extends State<ChatPage> {
           .add({
         'senderId': 'adjoint',
         'receiverId': widget.userId,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': Timestamp.now(),
         'content': _messageController.text,
         'read': false,
       });
@@ -157,7 +159,8 @@ class _ChatPageState extends State<ChatPage> {
       elevation: 4,
       child: Column(
         children: [
-          Expanded(child: messagesListWidget()),
+          Expanded(child:
+          messagesListWidget()),
           messageInputWidget(),
         ],
       ),
@@ -260,6 +263,8 @@ class _ChatPageState extends State<ChatPage> {
           .collection('messagesadjointprof')
           .doc('chats')
           .collection('adjoint${widget.userId}')
+          .where('senderId', isEqualTo: '${widget.userId}')
+          .where('receiverId', isEqualTo: 'adjoint')
           .where('read', isEqualTo: false)
           .get()
           .then((snapshot) {

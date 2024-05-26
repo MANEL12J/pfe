@@ -14,16 +14,22 @@ class AdjointRep extends StatefulWidget {
 
 class _AdjointRep extends State<AdjointRep> {
   String idnavigateur;
+
+
   _AdjointRep(this.idnavigateur);
 
   List<String> courses = [];
-  late  List<List<TextEditingController>> controllers;
   String? selectedParcours;
+  String? errorMessage;
   String? selectedSemestre;
   int? nombreGroupes;
-  final List<String> parcours = ['L1', 'L2', 'L3', 'M1', 'M2'];
+  int nombreGroupes2  = 0 ;
+  final List<String> parcours = ['L1', 'L2', 'L3'];
   final List<String> semestres = ['Semestre 1', 'Semestre 2'];
   final TextEditingController groupeController = TextEditingController();
+  List<TextEditingController> emptyRowControllers = [];
+  List<List<TextEditingController>> groupControllersTD = [];
+  List<List<TextEditingController>> groupControllersTP = [];
   Widget? customTable;
 
   List<Map<String, dynamic>> filteredUsers = [];
@@ -100,15 +106,9 @@ class _AdjointRep extends State<AdjointRep> {
   @override
   void initState() {
     super.initState();
-
     _fetchChartData();
-
-
   }
-  void _initControllers() {
-    controllers = List.generate(nombreGroupes! * 2, (i) =>
-        List.generate(courses.length, (j) => TextEditingController()));
-  }
+
   String? selectedUserId;
   String? selectedUserId2;
   void selectUser(String userId) {
@@ -118,8 +118,7 @@ class _AdjointRep extends State<AdjointRep> {
   }
 
   String searchText = '';
-  void _valider(StateSetter updateState, String selectedParcours,
-      String selectedSemestre, TextEditingController groupeController) async {
+  void _valider(StateSetter updateState, String selectedParcours, String selectedSemestre, TextEditingController groupeController) async {
     if (selectedParcours.isNotEmpty &&
         selectedSemestre.isNotEmpty &&
         groupeController.text.isNotEmpty) {
@@ -133,14 +132,21 @@ class _AdjointRep extends State<AdjointRep> {
         List<Map<String, dynamic>> users =
         await getUsersByParcoursAndSemester(selectedParcours, semestre);
 
-        // Mise à jour de l'interface utilisateur dans le dialogue
+        // Mise à jour de l'état de manière synchrone
         updateState(() {
           filteredUsers = users;
-          customTable = _buildCustomTable(selectedParcours, selectedSemestre, nombreGroupes);
-          _initControllers();
+          nombreGroupes2 = int.tryParse(groupeController.text)!;
+          _updateCourses(selectedParcours, selectedSemestre);
+          if (courses.isNotEmpty) {
+            _initializeControllers(nombreGroupes2);
+            customTable = _buildCustomTable(selectedParcours, selectedSemestre, nombreGroupes);
+          } else {
+            customTable = null;
+          }
         });
+
       } else {
-        // Réinitialisation de l'interface utilisateur en cas d'erreur
+        // Réinitialisation de l'état en cas d'erreur
         updateState(() {
           filteredUsers = [];
           customTable = null;
@@ -149,8 +155,258 @@ class _AdjointRep extends State<AdjointRep> {
     }
   }
 
-  final TextEditingController _messageController = TextEditingController();
 
+
+  Future<Map<String, int>> gatherProfData() async {
+    Map<String, int> profCount = {};
+
+    void addEntry(String prof) {
+      if (prof.isNotEmpty) {
+        profCount.update(prof, (count) => count + 1, ifAbsent: () => 1);
+      }
+    }
+
+    // Collecte depuis emptyRowControllers
+    for (int i = 0; i < emptyRowControllers.length; i++) {
+      String prof = emptyRowControllers[i].text;
+      addEntry(prof);
+    }
+
+    // Collecte depuis groupControllersTD
+    for (var controllers in groupControllersTD) {
+      for (var controller in controllers) {
+        String prof = controller.text;
+        addEntry(prof);
+      }
+    }
+
+    // Collecte depuis groupControllersTP
+    for (var controllers in groupControllersTP) {
+      for (var controller in controllers) {
+        String prof = controller.text;
+        addEntry(prof);
+      }
+    }
+
+    return profCount;
+  }
+  Future<void> _showRepartitionDialog(BuildContext context) async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+    final int anneeActuelle = DateTime.now().year;
+
+    DocumentReference anneeRef = firestore.collection('repartition').doc(anneeActuelle.toString());
+
+    Map<String, Map<String, Map<String, Map<String, String>>>> repartitionData = {};
+
+    List<String> parcoursList = ['L1', 'L2', 'L3'];
+    List<String> semestreList = ['Semestre 1', 'Semestre 2'];
+
+    for (String parcours in parcoursList) {
+      repartitionData[parcours] = {};
+      for (String semestre in semestreList) {
+        List<String> modules = _getModulesForParcoursSemestre(parcours, semestre);
+        repartitionData[parcours]![semestre] = {};
+
+        for (String module in modules) {
+          repartitionData[parcours]![semestre]![module] = {'Cours': 'N/A', 'TD': 'N/A', 'TP': 'N/A'};
+          for (String type in ['Cours', 'TD', 'TP']) {
+            try {
+              var collectionRef = anneeRef.collection(parcours).doc(semestre).collection(type);
+              var snapshot = await collectionRef.where('module', isEqualTo: module).get();
+              var profs = snapshot.docs.isNotEmpty
+                  ? snapshot.docs.map((doc) => doc.data()['prof'] as String? ?? 'N/A').join(', ')
+                  : 'N/A';
+              repartitionData[parcours]![semestre]![module]![type] = profs;
+            } catch (e) {
+              print("Error accessing Firestore for $type: $e");
+            }
+          }
+        }
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Données de Répartition"),
+          content: SingleChildScrollView(
+            child: Column(
+              children: parcoursList.map((parcours) => ExpansionTile(
+                title: Text(parcours),
+                children: semestreList.map((semestre) {
+                  List<String> modules = _getModulesForParcoursSemestre(parcours, semestre);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(semestre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      ),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columns: [
+                            DataColumn(label: Text('Module')),
+                            DataColumn(label: Text('Cours')),
+                            DataColumn(label: Text('TD')),
+                            DataColumn(label: Text('TP')),
+                          ],
+                          rows: modules.map((module) => DataRow(
+                            cells: [
+                              DataCell(Text(module)),
+                              DataCell(Text(repartitionData[parcours]![semestre]![module]!['Cours'] ?? 'N/A')),
+                              DataCell(Text(repartitionData[parcours]![semestre]![module]!['TD'] ?? 'N/A')),
+                              DataCell(Text(repartitionData[parcours]![semestre]![module]!['TP'] ?? 'N/A')),
+                            ],
+                          )).toList(),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              )).toList(),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text("OK"),
+              onPressed: () {
+                Navigator.of(context). pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+  List<String> _getModulesForParcoursSemestre(String parcours, String semestre) {
+    Map<String, Map<String, List<String>>> courses = {
+      'L1': {
+        'Semestre 1': [
+          'Analyse1', 'Algèbre 1', 'ASD', 'Structure Machine 1', 'Terminologie Scientifique', 'Langue Étrangère', 'Option (Physique / Mécanique du Point)'
+        ],
+        'Semestre 2': [
+          'Analyse2', 'Algèbre 2', 'ASD 2', 'Structure Machine 2', 'Proba/ statistique', 'Technologies de l\'information et communication', 'Option (Physique / Mécanique du Point)', 'Outills de programmation pour les mathématiques'
+        ]
+      },
+      'L2': {
+        'Semestre 1': [
+          'Architecture ordinateur', 'ASD3', 'THG', 'Système d\'information', 'Méthodes numériques', 'Logique mathématiques', 'Langue étrangère 2'
+        ],
+        'Semestre 2': [
+          'THL', 'Système d\'exploitation 1', 'Base de données', 'Réseaux', 'Programmation orientée objet', 'Développement applications web', 'Langue étrangère 3'
+        ]
+      },
+      'L3': {
+        'Semestre 1': [
+          'Système d\'exploitation 2', 'Compilation', 'IHM', 'Génie logiciel', 'Programmation linéaire', 'Probabilités et statistiques', 'Économie numérique'
+        ],  'Semestre 2': [
+          'Applications mobiles', 'Sécurité informatique', 'Intelligence artificielle', 'Données semi-structurées', 'Rédaction scientifique', 'Projet', 'Création et développement web'
+        ]
+      }
+    };
+
+    return courses[parcours]?[semestre] ?? [];
+  }
+
+
+
+
+
+  Future<void> _saveDataToFirebase() async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+    final int anneeActuelle = DateTime.now().year;
+
+    for (int i = 0; i < emptyRowControllers.length; i++) {
+      final module = courses[i];
+      final contenu = emptyRowControllers[i].text;
+      if(module.isNotEmpty){
+        await firestore
+            .collection('repartition')
+            .doc(anneeActuelle.toString())
+            .collection(selectedParcours!)
+            .doc(selectedSemestre!)
+            .collection('Cours')
+            .add({
+          'prof': contenu,
+          'module': module,
+          'parcours': selectedParcours,
+          'semestre': selectedSemestre!,
+          'type' : 'Cours',
+        });
+      }
+
+    }
+
+    // Boucle à travers les groupes TD
+    for (int i = 0; i < groupControllersTD.length; i++) {
+      final numeroGroupe = i + 1;
+
+      // Sauvegarde des données pour chaque module TD
+      for (int j = 0; j < groupControllersTD[i].length; j++) {
+        final module = courses[j];
+        final contenu = groupControllersTD[i][j].text;
+
+        if (contenu.isNotEmpty) {
+          await firestore
+              .collection('repartition')
+              .doc(anneeActuelle.toString())
+              .collection(selectedParcours!)
+              .doc(selectedSemestre!)
+              .collection('TD')
+              .add({
+            'prof': contenu,
+            'module': module,
+            'parcours': selectedParcours,
+            'semestre': selectedSemestre!,
+            'type' : ' TD: ${i+1}',
+          });
+        }
+      }
+    }
+
+    // Boucle à travers les groupes TP
+    for (int i = 0; i < groupControllersTP.length; i++) {
+      final numeroGroupe = i + 1;
+
+      // Sauvegarde des données pour chaque module TP
+      for (int j = 0; j < groupControllersTP[i].length; j++) {
+        final module = courses[j];
+        final contenu = groupControllersTP[i][j].text;
+
+        if (contenu.isNotEmpty) {
+          await firestore
+              .collection('repartition')
+              .doc(anneeActuelle.toString())
+              .collection(selectedParcours!)
+              .doc(selectedSemestre!)
+              .collection('TP')
+              .add({
+            'prof': contenu,
+            'module': module,
+            'parcours': selectedParcours,
+            'semestre': selectedSemestre!,
+            'type' : ' TP: ${i+1}',
+          });
+        }
+      }
+    }
+  }
+  void showOverloadAlert(String message) {
+    // Use your framework's alert/dialog mechanism here, e.g., for Flutter:
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: Duration(seconds: 6),
+      ),
+    );
+  }
+
+  final TextEditingController _messageController = TextEditingController();
   void _sendMessage(String message, String userId) {
     if (message.isNotEmpty) {
       FirebaseFirestore.instance.collection('messages').add({
@@ -162,7 +418,6 @@ class _AdjointRep extends State<AdjointRep> {
       _messageController.clear();
     }
   }
-
   void markMessagesAsRead(String senderId) {
     FirebaseFirestore.instance
         .collection('messages')
@@ -175,7 +430,6 @@ class _AdjointRep extends State<AdjointRep> {
       }
     });
   }
-
   List<StatusData> _chartData = [];
   Future<void> _fetchChartData() async {
     QuerySnapshot querySnapshot =
@@ -200,7 +454,6 @@ class _AdjointRep extends State<AdjointRep> {
       _chartData = pieData;
     });
   }
-
   Color blue = Color(0xff0036FE);
   Color red = Color(0xffDD6DF1);
   Color Green = Color(0xff1BD0A3);
@@ -280,26 +533,7 @@ class _AdjointRep extends State<AdjointRep> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => showDialog(
-                            context: context,
-                            builder: (context) {
-                              return Dialog(
-                                backgroundColor: Colors.white,
-                                child: StatefulBuilder(
-                                  builder: (BuildContext context, StateSetter setState) {
-                                    return Container(
-                                      color: Colors.white,
-                                      width: MediaQuery.of(context).size.width * 0.95,
-                                      height: MediaQuery.of(context).size.height * 0.95,
-                                      child: SingleChildScrollView(
-                                        child: premierTabContent(setState: setState),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          ),
+                          onPressed: () => _showFormDialog(context)  ,
                           style: ElevatedButton.styleFrom(
                             primary: blue,  // Background color
                             padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
@@ -444,7 +678,6 @@ class _AdjointRep extends State<AdjointRep> {
 
     );
   }
-
   Widget buildChatDialog(BuildContext context) {
     double width = MediaQuery.of(context).size.width *
         0.4; // Wider dialog for better readability
@@ -500,9 +733,7 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
-  Widget buildInputField(BuildContext context,
-      TextEditingController messageController, double width) {
+  Widget buildInputField(BuildContext context, TextEditingController messageController, double width) {
     // Implement your input field for messages here
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -533,7 +764,6 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
   Widget buildMessageList(BuildContext context, double width) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -625,9 +855,7 @@ class _AdjointRep extends State<AdjointRep> {
       },
     );
   }
-
-  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context,
-      {required Function(String) onSelectUser}) {
+  Widget buildUsersTable(List<Map<String, dynamic>> users, BuildContext context, {required Function(String) onSelectUser}) {
     if (users.isEmpty) {
       return Center(child: Text("Pas d'enseignants trouvé"));
     }
@@ -704,7 +932,6 @@ class _AdjointRep extends State<AdjointRep> {
       ],
     );
   }
-
   Widget statusWidget(String? status) {
     switch (status) {
       case "rien":
@@ -746,7 +973,6 @@ class _AdjointRep extends State<AdjointRep> {
         return Container(); // Default case to handle unexpected status
     }
   }
-
 // Helper method to create a decorated container for dropdowns
   Widget decorBox({required Widget child}) {
     return Container(
@@ -766,7 +992,6 @@ class _AdjointRep extends State<AdjointRep> {
       child: child,
     );
   }
-
   Widget userSearchResults() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('users').snapshots(),
@@ -818,7 +1043,6 @@ class _AdjointRep extends State<AdjointRep> {
       },
     );
   }
-
   Widget userDetails(String? userId) {
     if (userId == null) {
       return Center(child: Text("", style: TextStyle(fontSize: 14)));
@@ -838,7 +1062,6 @@ class _AdjointRep extends State<AdjointRep> {
       ],
     );
   }
-
   Widget semesterDetails(String? userId, String semester) {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -929,7 +1152,6 @@ class _AdjointRep extends State<AdjointRep> {
       },
     );
   }
-
   Widget deuxiemeTabContent() {
     return Row(
       children: <Widget>[
@@ -1008,121 +1230,278 @@ class _AdjointRep extends State<AdjointRep> {
       ],
     );
   }
+  void _initializeControllers(int nombreGroupes) {
+    emptyRowControllers = List.generate(courses.length, (index) => TextEditingController());
+    groupControllersTD = List.generate(nombreGroupes, (groupIndex) {
+      return List.generate(courses.length, (courseIndex) => TextEditingController());
+
+    });
+    groupControllersTP = List.generate(nombreGroupes, (groupIndex) {
+      return List.generate(courses.length, (courseIndex) => TextEditingController());
+
+    });
+  }
+  void _showFormDialog(BuildContext scaffoldContext) { // Notez l'ajout du contexte du Scaffold ici
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: StatefulBuilder(
+            builder: (BuildContext context, void Function(void Function()) setState) {
+              return Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                height: MediaQuery.of(context).size.height * 0.9,
+                child: premierTabContent(setState: setState),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+  Future<void> attemptSaveData(BuildContext scaffoldContext) async { // Utilisez ce contexte pour la SnackBar
+    var profCount = await gatherProfData();
+    bool overloadFound = false;
+    List<String> overloadedProfs = [];
+
+    profCount.forEach((prof, count) {
+      if (count > 8) {
+        overloadedProfs.add(prof);
+        overloadFound = true;
+      }
+    });
+
+    if (overloadFound) {
+      String profNames = overloadedProfs.join(", ");
+      setState(() {
+        errorMessage = "Surcharge détectée pour les professeurs suivants : $profNames. Sauvegarde impossible.";
+      });
+    } else {
+      await _saveDataToFirebase();
+      // Remplacez cette fonction par votre méthode de sauvegarde.
+      setState(() {
+        errorMessage = 'Sauvgarde réussite pour ce semestre '; // Clear the error message on successful save
+      });
+    }
+    showErrorDialog(errorMessage!);
+  }
+  void showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("New message"),
+          content: Text(
+            message,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text("OK"),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget premierTabContent({required void Function(void Function()) setState}) {
+
+
+    // Helper function to create a course card
+    Widget courseCard(String title, bool isSelected) {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedParcours = title;
+          });
+        },
+        child: Card(
+          color: isSelected ? Colors.green : Colors.white,
+          child: Padding(
+            padding: EdgeInsets.all(8),
+            child: Center(
+              child: Text(title, style: TextStyle(color: isSelected ? Colors.white : Colors.black)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Helper function to create a semester card
+    Widget semesterCard(String title, bool isSelected) {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedSemestre = title;
+          });
+        },
+        child: Card(
+          color: isSelected ? Colors.green : Colors.white,
+          child: Padding(
+            padding: EdgeInsets.all(8),
+            child: Center(
+              child: Text(title, style: TextStyle(color: isSelected ? Colors.white : Colors.black)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Title widget
+    Widget sectionTitle(String title) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
+        child: Text(
+          title,
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue[800]),
+        ),
+      );
+    }
+
+    double commonHeight = 50.0; // Common height for TextField and Buttons
+
+    // Layout for user interactions
     return SingleChildScrollView(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              sectionTitle("Effectuer Répartition"),
+              SizedBox(width: 100),
+
+              Expanded(
+                child: FractionallySizedBox(
+                  widthFactor: 0.3,
+                  child: Container(
+                    height: commonHeight,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        _showRepartitionDialog(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.orange,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Envoiyer la répartion Globale',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Divider(thickness: 2, color: Colors.blue.shade100),
+          ),
+
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: <Widget>[
-                // Dropdown for parcours selection
-                Expanded(
-                  child: decorBox(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedParcours,
-                        hint: Text('Choisir un parcours'),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedParcours = newValue;
-                          });
-                        },
-                        items: parcours
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text('Choisir un Parcours : ' , style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold
+                    ),),
+                    courseCard("L1", selectedParcours == "L1"),
+                    courseCard("L2", selectedParcours == "L2"),
+                    courseCard("L3", selectedParcours == "L3"),
+                  ],
                 ),
+                SizedBox(width: 20),
+                Text('Choisir un Semestre: ' , style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold
+                ),),
+                Expanded(child: semesterCard("Semestre 1", selectedSemestre == "Semestre 1")),
+                Expanded(child: semesterCard("Semestre 2", selectedSemestre == "Semestre 2")),
                 SizedBox(width: 10),
-                // Dropdown for semester selection
                 Expanded(
-                  child: decorBox(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedSemestre,
-                        hint: Text('Choisir un semestre'),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedSemestre = newValue;
-                          });
+                  child: FractionallySizedBox(
+                    widthFactor: 0.7,
+                    child: Container(
+                      height: commonHeight,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          attemptSaveData(context);
                         },
-                        items: semestres
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 10),
-                // TextField for group number input
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: TextField(
-                      controller: groupeController,
-                      decoration: InputDecoration(
-                        labelText: 'Nombre de groupes',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                        style: ElevatedButton.styleFrom(
+                          primary: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        prefixIcon: Icon(Icons.group),
+                        child: Text(
+                          'Sauvgarder pour ce semestre',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      keyboardType: TextInputType.number,
                     ),
-                  ),
-                ),
-                SizedBox(width: 10),
-                // Button to validate the input
-                ElevatedButton(
-                  onPressed: () {
-                    _valider(setState, selectedParcours!, selectedSemestre!, groupeController);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    primary: Colors.blueAccent, // Button color
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(12), // Rounded corners
-                    ),
-                  ),
-                  child: Text(
-                    'Valider',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    saveDataToFirebase;
-                  },
-                  style: ElevatedButton.styleFrom(
-                    primary: Colors.blueAccent, // Button color
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(12), // Rounded corners
-                    ),
-                  ),
-                  child: Text(
-                    'Sauvgarder rep ',
-                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ],
             ),
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Container(
+                  height: commonHeight,
+                  child: TextField(
+                    controller: groupeController,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre de groupes',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: Icon(Icons.group),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: FractionallySizedBox(
+                  widthFactor: 0.5,
+                  child: Container(
+                    height: commonHeight,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _valider(setState, selectedParcours!, selectedSemestre!, groupeController);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.grey,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Générer Table',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            ],
+          ),
+
           if (customTable != null)
             Container(
               height: MediaQuery.of(context).size.height * 0.95,
@@ -1140,10 +1519,7 @@ class _AdjointRep extends State<AdjointRep> {
                       ),
                       child: Align(
                         alignment: Alignment.topLeft,
-                        child: Expanded(
-                          child:
-                          customTable!, // Assurez-vous que customTable est capable de gérer l'overflow.
-                        ),
+                        child: customTable!,
                       ),
                     ),
                   ),
@@ -1158,73 +1534,57 @@ class _AdjointRep extends State<AdjointRep> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            "Recommendation",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.blue[800],
-                            ),
+                        sectionTitle("Recommendation"),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: filteredUsers.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              var user = filteredUsers[index];
+                              return Card(
+                                elevation: 2,
+                                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                child: ListTile(
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                          child: Text(user['displayName'],
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1)),
+                                      Expanded(
+                                          child: Text(abbreviate(user['grade']),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1))
+                                    ],
+                                  ),
+                                  subtitle: Text(
+                                    "Module: ${user['moduleName']}",
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                        Expanded(
-                            child: ListView.builder(
-                              itemCount: filteredUsers.length,
-                              itemBuilder: (BuildContext context, int index) {
-                                var user = filteredUsers[index];
-                                return Card(
-                                  elevation: 2,
-                                  margin: const EdgeInsets.symmetric(
-                                      vertical: 4, horizontal: 8),
-                                  child: ListTile(
-                                    title: Row(
-                                      children: [
-                                        Expanded(
-                                            child: Text(
-                                              user['displayName'],
-                                              overflow: TextOverflow
-                                                  .ellipsis, // Ajoute des points de suspension si nécessaire
-                                              maxLines:
-                                              1, // Garde le texte sur une seule ligne
-                                            )),
-                                        Expanded(
-                                            child: Text(
-                                              abbreviate(user['grade']),
-                                              overflow: TextOverflow
-                                                  .ellipsis, // Ajoute des points de suspension si nécessaire
-                                              maxLines:
-                                              1, // Garde le texte sur une seule ligne
-                                            ))
-                                      ],
-                                    ),
-                                    subtitle: Text(
-                                      "Module: ${user['moduleName']}",
-                                      style: TextStyle(fontWeight: FontWeight.bold),
-                                      overflow: TextOverflow
-                                          .ellipsis, // Gère le texte long dans le sous-titre
-                                      maxLines:
-                                      1, // Garde le sous-titre sur une seule ligne
-                                    ),
-                                  ),
-                                );
-                              },
-                            )),
                       ],
                     ),
                   ),
                 ],
               ),
             )
-          // Optionally add more widgets or another column here depending on your UI needs
         ],
       ),
     );
   }
-  Widget _buildCustomTable(
-      String selectedParcours, String selectedSemestre, int numberOfGroups) {
-    _updateCourses(selectedParcours, selectedSemestre);
+
+
+
+// This is a dummy function to mimic charge checking logic
+
+
+  Widget _buildCustomTable(String selectedParcours, String selectedSemestre, int numberOfGroups) {
+    _valider((fn) { }, selectedParcours, selectedSemestre, groupeController);
     List<Widget> rows = [
       Divider(),
       _buildCoursesHeader(),
@@ -1235,7 +1595,7 @@ class _AdjointRep extends State<AdjointRep> {
 
     // Adding all TDs
     for (int i = 1; i <= numberOfGroups; i++) {
-      rows.add(_buildGroupRow('TD', i));
+      rows.add(_buildGroupRowTD('TD', i));
     }
 
     // Adding a separator between TDs and TPs
@@ -1243,7 +1603,7 @@ class _AdjointRep extends State<AdjointRep> {
 
     // Adding all TPs
     for (int i = 1; i <= numberOfGroups; i++) {
-      rows.add(_buildGroupRow('TP', i));
+      rows.add(_buildGroupRowTP('TP', i));
     }
 
     return SingleChildScrollView(
@@ -1253,7 +1613,6 @@ class _AdjointRep extends State<AdjointRep> {
     );
   }
   Widget _buildEmptyRowWithLabel() {
-
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 0.5),
@@ -1267,10 +1626,10 @@ class _AdjointRep extends State<AdjointRep> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
             ),
-            ...List.generate(
-                courses.length,
-                    (index) => Expanded(
+            ...List.generate(courses.length, (index) =>
+                Expanded(
                   child: TextField(
+                    controller: emptyRowControllers[index],
                     style: TextStyle(fontSize: 10),
                     decoration: InputDecoration(
                       hintText: '',
@@ -1317,7 +1676,7 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-  Widget _buildGroupRow(String type, int index) {
+  Widget _buildGroupRowTD(String type, int number) {
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 0.2),
@@ -1328,57 +1687,67 @@ class _AdjointRep extends State<AdjointRep> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             Expanded(
-              child: Text('$type ${index % nombreGroupes! + 1}',
+              child: Text('$type$number',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
             ),
-            ...List.generate(
-                courses.length,
-                    (i) => Expanded(
-                  child: TextField(
-                    controller: controllers[index][i],
-                    style: TextStyle(fontSize: 10),
-                    decoration: InputDecoration(
-                      hintText: '',
-                      hintStyle: TextStyle(fontSize: 10),
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8.0),
-                    ),
+            ...List.generate(courses.length, (index) => Expanded(
+              child: TextField(
+                controller: groupControllersTD[number - 1][index],
+                style: TextStyle(fontSize: 10),
+                decoration: InputDecoration(
+                  hintText: '',
+                  hintStyle: TextStyle(fontSize: 10),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                  constraints: BoxConstraints(
+                    maxHeight:
+                    30, // Hauteur maximale du TextField réduite
                   ),
-                )
-            ),
+                ),
+              ),
+            )),
           ],
         ),
       ),
     );
   }
-
-  // Upload data to Firebase
-  Future<void> saveDataToFirebase() async {
-    String year = DateTime.now().year.toString(); // Example: '2024'
-    Map<String, dynamic> data = {};
-
-    for (int i = 0; i < controllers.length; i++) {
-      String groupType = i < nombreGroupes! ? 'TD' : 'TP';
-      int groupNumber = i % nombreGroupes! + 1;
-
-      for (int j = 0; j < courses.length; j++) {
-        String courseName = courses[j];
-        String inputText = controllers[i][j].text;
-
-        data['$groupType$groupNumber-$courseName'] = inputText;
-      }
-    }
-
-    FirebaseFirestore.instance.collection('Rep').doc(year).
-    collection(selectedParcours!)
-        .doc(selectedSemestre!)
-        .collection(selectedSemestre!)
-        .add(data)
-        .then((value) => print("Data added"))
-        .catchError((error) => print("Failed to add data: $error"));
+  Widget _buildGroupRowTP(String type, int number) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black, width: 0.2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: Text('$type$number',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
+            ),
+            ...List.generate(courses.length, (index) => Expanded(
+              child: TextField(
+                controller: groupControllersTP[number - 1][index],
+                style: TextStyle(fontSize: 10),
+                decoration: InputDecoration(
+                  hintText: '',
+                  hintStyle: TextStyle(fontSize: 10),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                  constraints: BoxConstraints(
+                    maxHeight:
+                    30, // Hauteur maximale du TextField réduite
+                  ),
+                ),
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
   }
-
   void _updateCourses(String selectedParcours, String selectedSemestre) {
     // Define course lists for each year and semester
     if (selectedParcours == 'L1') {
@@ -1400,7 +1769,8 @@ class _AdjointRep extends State<AdjointRep> {
           'Structure Machine 2',
           'Proba/ statistique',
           'Technologies de l\'information et communication',
-          'Option (Physique / Mécanique du Point)'
+          'Option (Physique / Mécanique du Point)',
+          'Outills de programmation pour les mathématiques'
         ];
       }
     } else if (selectedParcours == 'L2') {

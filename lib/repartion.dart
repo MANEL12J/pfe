@@ -3,7 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:badges/badges.dart' as badges;
-import 'package:syncfusion_flutter_charts/charts.dart'; // Alias for the external badges package
+import 'package:syncfusion_flutter_charts/charts.dart';
+
+import 'nagivateuradjoint.dart'; // Alias for the external badges package
 
 class AdjointRep extends StatefulWidget {
   String idnavigateur;
@@ -14,14 +16,17 @@ class AdjointRep extends StatefulWidget {
 
 class _AdjointRep extends State<AdjointRep> {
   String idnavigateur;
+
+
   _AdjointRep(this.idnavigateur);
 
   List<String> courses = [];
   String? selectedParcours;
+  String? errorMessage;
   String? selectedSemestre;
   int? nombreGroupes;
   int nombreGroupes2  = 0 ;
-  final List<String> parcours = ['L1', 'L2', 'L3', 'M1', 'M2'];
+  final List<String> parcours = ['L1', 'L2', 'L3'];
   final List<String> semestres = ['Semestre 1', 'Semestre 2'];
   final TextEditingController groupeController = TextEditingController();
   List<TextEditingController> emptyRowControllers = [];
@@ -151,45 +156,288 @@ class _AdjointRep extends State<AdjointRep> {
       }
     }
   }
-  void _initializeControllers(int nombreGroupes) {
-    emptyRowControllers = List.generate(courses.length, (index) => TextEditingController());
-    groupControllersTD = List.generate(nombreGroupes, (groupIndex) {
-      return List.generate(courses.length, (courseIndex) => TextEditingController());
 
-    });
-    groupControllersTP = List.generate(nombreGroupes, (groupIndex) {
-      return List.generate(courses.length, (courseIndex) => TextEditingController());
 
-    });
+
+  Future<Map<String, int>> gatherProfData() async {
+    Map<String, int> profCount = {};
+
+    void addEntry(String prof) {
+      if (prof.isNotEmpty) {
+        profCount.update(prof, (count) => count + 1, ifAbsent: () => 1);
+      }
+    }
+
+    // Collecte depuis emptyRowControllers
+    for (int i = 0; i < emptyRowControllers.length; i++) {
+      String prof = emptyRowControllers[i].text;
+      addEntry(prof);
+    }
+
+    // Collecte depuis groupControllersTD
+    for (var controllers in groupControllersTD) {
+      for (var controller in controllers) {
+        String prof = controller.text;
+        addEntry(prof);
+      }
+    }
+
+    // Collecte depuis groupControllersTP
+    for (var controllers in groupControllersTP) {
+      for (var controller in controllers) {
+        String prof = controller.text;
+        addEntry(prof);
+      }
+    }
+
+    return profCount;
   }
-  void _showFormDialog() {
+  Future<void> _showRepartitionDialog(BuildContext context) async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+    final int anneeActuelle = DateTime.now().year;
+
+    DocumentReference anneeRef = firestore.collection('repartition').doc(anneeActuelle.toString());
+
+    Map<String, Map<String, Map<String, Map<String, String>>>> repartitionData = {};
+
+    List<String> parcoursList = ['L1', 'L2', 'L3'];
+    List<String> semestreList = ['Semestre 1', 'Semestre 2'];
+
+    Future<void> fetchData() async {
+      for (String parcours in parcoursList) {
+        repartitionData[parcours] = {};
+        for (String semestre in semestreList) {
+          List<String> modules = _getModulesForParcoursSemestre(parcours, semestre);
+          repartitionData[parcours]![semestre] = {};
+
+          for (String module in modules) {
+            repartitionData[parcours]![semestre]![module] = {'Cours': 'N/A', 'TD': 'N/A', 'TP': 'N/A'};
+            for (String type in ['Cours', 'TD', 'TP']) {
+              try {
+                var collectionRef = anneeRef.collection(parcours).doc(semestre).collection(type);
+                var snapshot = await collectionRef.where('module', isEqualTo: module).get();
+                var profs = snapshot.docs.isNotEmpty
+                    ? snapshot.docs.map((doc) => doc.data()['prof'] as String? ?? 'N/A').join(', ')
+                    : 'N/A';
+                repartitionData[parcours]![semestre]![module]![type] = profs;
+              } catch (e) {
+                print("Error accessing Firestore for $type: $e");
+              }
+            }
+          }
+        }
+      }
+    }
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          content: StatefulBuilder(
-            builder: (BuildContext context, void Function(void Function()) setState) {
-              return Container(
-                width: MediaQuery.of(context).size.width * 0.9,
-                height: MediaQuery.of(context).size.height * 0.9,
-                child: premierTabContent(setState: setState),
-              );
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Données de Répartition"),
+              SizedBox(width: 20),
+              Container(
+                height: 48,
+                child: MaterialButton(
+                  onPressed: () async {
+                    final int currentYear = DateTime.now().year;
+                    await firestore.collection('repartition').doc(currentYear.toString()).set({
+                      'valide': 'en attente',
+                    }, SetOptions(merge: true));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => navigationadjoint(idnavigateur: "adjoint")),
+                    ); // Fermer la boîte de dialogue
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Répartition envoyée au chef de département')),
+                    );
+                    // Ajoutez ici le code pour envoyer les données au chef de département
+                    print("Envoyer au chef de département");
+                  },
+                  color: Colors.blue,
+                  textColor: Colors.white,
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text("Envoyer au chef de département"),
+                ),
+              ),
+            ],
+          ),
+          content: FutureBuilder(
+            future: fetchData(),
+            builder: (BuildContext context, AsyncSnapshot snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(child: Text("Erreur lors du chargement des données"));
+              } else {
+                return SingleChildScrollView(
+                  child: Column(
+                    children: parcoursList.map((parcours) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text(parcours, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: semestreList.map((semestre) {
+                              List<String> modules = _getModulesForParcoursSemestre(parcours, semestre);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                    child: Text(semestre, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                                  ),
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width),
+                                      child: Table(
+                                        border: TableBorder.all(color: Colors.grey, width: 1),
+                                        defaultColumnWidth: FixedColumnWidth(100.0),
+                                        children: [
+                                          TableRow(
+                                            decoration: BoxDecoration(color: Colors.grey[300]),
+                                            children: [
+                                              TableCell(
+                                                child: Padding(
+                                                  padding: EdgeInsets.all(8.0),
+                                                  child: Text('Modules', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ),
+                                              ...modules.map((module) {
+                                                return TableCell(
+                                                  child: Padding(
+                                                    padding: EdgeInsets.all(8.0),
+                                                    child: Text(module, style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                            ],
+                                          ),
+                                          ...['Cours', 'TD', 'TP'].map((type) {
+                                            return TableRow(
+                                              children: [
+                                                TableCell(
+                                                  child: Padding(
+                                                    padding: EdgeInsets.all(8.0),
+                                                    child: Text(type, style: TextStyle(fontWeight: FontWeight.bold)),
+                                                  ),
+                                                ),
+                                                ...modules.map((module) {
+                                                  String cellValue = repartitionData[parcours]![semestre]![module]![type] ?? 'N/A';
+                                                  return TableCell(
+                                                    child: Container(
+                                                      color: cellValue == 'N/A' ? Colors.orange[200] : null,
+                                                      padding: EdgeInsets.all(8.0),
+                                                      child: Text(cellValue),
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                              ],
+                                            );
+                                          }).toList(),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                          Divider(
+                            thickness: 2.0, // Set the thickness to 2.0 pixels
+                            color: Colors.black, // You can also change the color if needed
+                          ), // Add a divider here
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                );
+              }
             },
           ),
+          actions: <Widget>[
+            TextButton(
+              child: Text("OK"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
         );
       },
     );
   }
+  List<String> _getModulesForParcoursSemestre(String parcours, String semestre) {
+    Map<String, Map<String, List<String>>> courses = {
+      'L1': {
+        'Semestre 1': [
+          'Analyse1', 'Algèbre 1', 'ASD', 'Structure Machine 1', 'Terminologie Scientifique', 'Langue Étrangère', 'Option (Physique / Mécanique du Point)'
+        ],
+        'Semestre 2': [
+          'Analyse2', 'Algèbre 2', 'ASD 2', 'Structure Machine 2', 'Proba/ statistique', 'Technologies de l\'information et communication', 'Option (Physique / Mécanique du Point)', 'Outills de programmation pour les mathématiques'
+        ]
+      },
+      'L2': {
+        'Semestre 1': [
+          'Architecture ordinateur', 'ASD3', 'THG', 'Système d\'information', 'Méthodes numériques', 'Logique mathématiques', 'Langue étrangère 2'
+        ],
+        'Semestre 2': [
+          'THL', 'Système d\'exploitation 1', 'Base de données', 'Réseaux', 'Programmation orientée objet', 'Développement applications web', 'Langue étrangère 3'
+        ]
+      },
+      'L3': {
+        'Semestre 1': [
+          'Système d\'exploitation 2', 'Compilation', 'IHM', 'Génie logiciel', 'Programmation linéaire', 'Probabilités et statistiques', 'Économie numérique'
+        ],
+        'Semestre 2': [
+          'Applications mobiles', 'Sécurité informatique', 'Intelligence artificielle', 'Données semi-structurées', 'Rédaction scientifique', 'Projet', 'Création et développement web'
+        ]
+      }
+    };
+
+    return courses[parcours]?[semestre] ?? [];
+  }
+
+
+
+
+
 
 
   Future<void> _saveDataToFirebase() async {
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     final int anneeActuelle = DateTime.now().year;
+    DocumentReference anneeDocRef = firestore.collection('repartition').doc(anneeActuelle.toString());
 
+    // Retrieve the document first
+    DocumentSnapshot anneeDocSnapshot = await anneeDocRef.get();
+
+    // Check if 'valid' field exists, if not, initialize it to 'non'
+    if (anneeDocSnapshot.exists) {
+      Map<String, dynamic> data = anneeDocSnapshot.data() as Map<String, dynamic>? ?? {};
+      if (!data.containsKey('valide')) {
+        anneeDocRef.set({'valide': 'non'}, SetOptions(merge: true)); // Using merge to not overwrite other fields
+      }
+    } else {
+      // Document does not exist, set 'valid' to 'non'
+      anneeDocRef.set({'validE': 'non'});
+    }
+
+    // Example of how you might save course data
     for (int i = 0; i < emptyRowControllers.length; i++) {
       final module = courses[i];
       final contenu = emptyRowControllers[i].text;
-      if(module.isNotEmpty){
+      if (module.isNotEmpty) {
         await firestore
             .collection('repartition')
             .doc(anneeActuelle.toString())
@@ -201,11 +449,12 @@ class _AdjointRep extends State<AdjointRep> {
           'module': module,
           'parcours': selectedParcours,
           'semestre': selectedSemestre!,
-          'type' : 'Cours',
+          'type': 'Cours',
         });
       }
-
     }
+
+    // Continue with saving TD and TP data as in the previous message
 
     // Boucle à travers les groupes TD
     for (int i = 0; i < groupControllersTD.length; i++) {
@@ -260,6 +509,16 @@ class _AdjointRep extends State<AdjointRep> {
         }
       }
     }
+  }
+
+  void showOverloadAlert(String message) {
+    // Use your framework's alert/dialog mechanism here, e.g., for Flutter:
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: Duration(seconds: 6),
+      ),
+    );
   }
 
   final TextEditingController _messageController = TextEditingController();
@@ -389,7 +648,7 @@ class _AdjointRep extends State<AdjointRep> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _showFormDialog  ,
+                          onPressed: () => _showFormDialog(context)  ,
                           style: ElevatedButton.styleFrom(
                             primary: blue,  // Background color
                             padding: EdgeInsets.symmetric(vertical: 10),  // Adjust padding to fit the height
@@ -1086,138 +1345,277 @@ class _AdjointRep extends State<AdjointRep> {
       ],
     );
   }
+  void _initializeControllers(int nombreGroupes) {
+    emptyRowControllers = List.generate(courses.length, (index) => TextEditingController());
+    groupControllersTD = List.generate(nombreGroupes, (groupIndex) {
+      return List.generate(courses.length, (courseIndex) => TextEditingController());
 
+    });
+    groupControllersTP = List.generate(nombreGroupes, (groupIndex) {
+      return List.generate(courses.length, (courseIndex) => TextEditingController());
+
+    });
+  }
+  void _showFormDialog(BuildContext scaffoldContext) { // Notez l'ajout du contexte du Scaffold ici
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: StatefulBuilder(
+            builder: (BuildContext context, void Function(void Function()) setState) {
+              return Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                height: MediaQuery.of(context).size.height * 0.9,
+                child: premierTabContent(setState: setState),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+  Future<void> attemptSaveData(BuildContext scaffoldContext) async { // Utilisez ce contexte pour la SnackBar
+    var profCount = await gatherProfData();
+    bool overloadFound = false;
+    List<String> overloadedProfs = [];
+
+    profCount.forEach((prof, count) {
+      if (count > 8) {
+        overloadedProfs.add(prof);
+        overloadFound = true;
+      }
+    });
+
+    if (overloadFound) {
+      String profNames = overloadedProfs.join(", ");
+      setState(() {
+        errorMessage = "Surcharge détectée pour les professeurs suivants : $profNames. Sauvegarde impossible.";
+      });
+    } else {
+      await _saveDataToFirebase();
+      // Remplacez cette fonction par votre méthode de sauvegarde.
+      setState(() {
+        errorMessage = 'Sauvgarde réussite pour ce semestre '; // Clear the error message on successful save
+      });
+    }
+    showErrorDialog(errorMessage!);
+  }
+  void showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("New message"),
+          content: Text(
+            message,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text("OK"),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
   Widget premierTabContent({required void Function(void Function()) setState}) {
+
+
+    // Helper function to create a course card
+    Widget courseCard(String title, bool isSelected) {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedParcours = title;
+          });
+        },
+        child: Card(
+          color: isSelected ? Colors.green : Colors.white,
+          child: Padding(
+            padding: EdgeInsets.all(8),
+            child: Center(
+              child: Text(title, style: TextStyle(color: isSelected ? Colors.white : Colors.black)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Helper function to create a semester card
+    Widget semesterCard(String title, bool isSelected) {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedSemestre = title;
+          });
+        },
+        child: Card(
+          color: isSelected ? Colors.green : Colors.white,
+          child: Padding(
+            padding: EdgeInsets.all(8),
+            child: Center(
+              child: Text(title, style: TextStyle(color: isSelected ? Colors.white : Colors.black)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Title widget
+    Widget sectionTitle(String title) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
+        child: Text(
+          title,
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue[800]),
+        ),
+      );
+    }
+
+    double commonHeight = 50.0; // Common height for TextField and Buttons
+
+    // Layout for user interactions
     return SingleChildScrollView(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              sectionTitle("Effectuer Répartition"),
+              SizedBox(width: 200),
+
+              Expanded(
+                child: FractionallySizedBox(
+                  widthFactor: 0.3,
+                  child: Container(
+                    height: commonHeight,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        _showRepartitionDialog(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.orange,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Visualiser  la répartion Globale',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Divider(thickness: 2, color: Colors.blue.shade100),
+          ),
+
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: <Widget>[
-                // Dropdown for parcours selection
-                Expanded(
-                  child: decorBox(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedParcours,
-                        hint: Text('Choisir un parcours'),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedParcours = newValue;
-                          });
-                        },
-                        items: parcours
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text('Choisir un Parcours : ' , style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold
+                    ),),
+                    courseCard("L1", selectedParcours == "L1"),
+                    courseCard("L2", selectedParcours == "L2"),
+                    courseCard("L3", selectedParcours == "L3"),
+                  ],
                 ),
+                SizedBox(width: 20),
+                Text('Choisir un Semestre: ' , style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold
+                ),),
+                Expanded(child: semesterCard("Semestre 1", selectedSemestre == "Semestre 1")),
+                Expanded(child: semesterCard("Semestre 2", selectedSemestre == "Semestre 2")),
                 SizedBox(width: 10),
-                // Dropdown for semester selection
                 Expanded(
-                  child: decorBox(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedSemestre,
-                        hint: Text('Choisir un semestre'),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedSemestre = newValue;
-                          });
+                  child: FractionallySizedBox(
+                    widthFactor: 0.7,
+                    child: Container(
+                      height: commonHeight,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          attemptSaveData(context);
                         },
-                        items: semestres
-                            .map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 10),
-                // TextField for group number input
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: TextField(
-                      controller: groupeController,
-                      decoration: InputDecoration(
-                        labelText: 'Nombre de groupes',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                        style: ElevatedButton.styleFrom(
+                          primary: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        prefixIcon: Icon(Icons.group),
+                        child: Text(
+                          'Sauvgarder pour ce semestre',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      keyboardType: TextInputType.number,
                     ),
-                  ),
-                ),
-                SizedBox(width: 10),
-                // Button to validate the input
-                ElevatedButton(
-                  onPressed: () async {
-                     _valider(setState, selectedParcours!, selectedSemestre!, groupeController);
-                    int? groupenumber = int.tryParse(groupeController.text);
-                    if (courses.isNotEmpty) {
-                      emptyRowControllers = List.generate(courses.length, (index) => TextEditingController());
-                      groupControllersTD = List.generate(nombreGroupes2, (groupIndex) {
-                        return List.generate(courses.length, (courseIndex) => TextEditingController());
-                      });
-                      groupControllersTP = List.generate(nombreGroupes2, (groupIndex) {
-                        return List.generate(courses.length, (courseIndex) => TextEditingController());
-                      });
-                    }
-                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                     print(courses.length);
-                     print(nombreGroupes2);
-                     print(groupControllersTD.length);
-                     print(groupControllersTP.length);
-                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                     print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                  },
-                  style: ElevatedButton.styleFrom(
-                    primary: Colors.blueAccent, // Button color
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(12), // Rounded corners
-                    ),
-                  ),
-                  child: Text(
-                    'Valider',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: _saveDataToFirebase,
-                  style: ElevatedButton.styleFrom(
-                    primary: Colors.green,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Save',
-                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ],
             ),
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Container(
+                  height: commonHeight,
+                  child: TextField(
+                    controller: groupeController,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre de groupes',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: Icon(Icons.group),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: FractionallySizedBox(
+                  widthFactor: 0.5,
+                  child: Container(
+                    height: commonHeight,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _valider(setState, selectedParcours!, selectedSemestre!, groupeController);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.grey,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Générer Table',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            ],
+          ),
+
           if (customTable != null)
             Container(
               height: MediaQuery.of(context).size.height * 0.95,
@@ -1235,10 +1633,7 @@ class _AdjointRep extends State<AdjointRep> {
                       ),
                       child: Align(
                         alignment: Alignment.topLeft,
-                        child: Expanded(
-                          child:
-                          customTable!, // Assurez-vous que customTable est capable de gérer l'overflow.
-                        ),
+                        child: customTable!,
                       ),
                     ),
                   ),
@@ -1253,72 +1648,57 @@ class _AdjointRep extends State<AdjointRep> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            "Recommendation",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.blue[800],
-                            ),
+                        sectionTitle("Recommendation"),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: filteredUsers.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              var user = filteredUsers[index];
+                              return Card(
+                                elevation: 2,
+                                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                child: ListTile(
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                          child: Text(user['displayName'],
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1)),
+                                      Expanded(
+                                          child: Text(abbreviate(user['grade']),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1))
+                                    ],
+                                  ),
+                                  subtitle: Text(
+                                    "Module: ${user['moduleName']}",
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                        Expanded(
-                            child: ListView.builder(
-                              itemCount: filteredUsers.length,
-                              itemBuilder: (BuildContext context, int index) {
-                                var user = filteredUsers[index];
-                                return Card(
-                                  elevation: 2,
-                                  margin: const EdgeInsets.symmetric(
-                                      vertical: 4, horizontal: 8),
-                                  child: ListTile(
-                                    title: Row(
-                                      children: [
-                                        Expanded(
-                                            child: Text(
-                                              user['displayName'],
-                                              overflow: TextOverflow
-                                                  .ellipsis, // Ajoute des points de suspension si nécessaire
-                                              maxLines:
-                                              1, // Garde le texte sur une seule ligne
-                                            )),
-                                        Expanded(
-                                            child: Text(
-                                              abbreviate(user['grade']),
-                                              overflow: TextOverflow
-                                                  .ellipsis, // Ajoute des points de suspension si nécessaire
-                                              maxLines:
-                                              1, // Garde le texte sur une seule ligne
-                                            ))
-                                      ],
-                                    ),
-                                    subtitle: Text(
-                                      "Module: ${user['moduleName']}",
-                                      style: TextStyle(fontWeight: FontWeight.bold),
-                                      overflow: TextOverflow
-                                          .ellipsis, // Gère le texte long dans le sous-titre
-                                      maxLines:
-                                      1, // Garde le sous-titre sur une seule ligne
-                                    ),
-                                  ),
-                                );
-                              },
-                            )),
                       ],
                     ),
                   ),
                 ],
               ),
             )
-          // Optionally add more widgets or another column here depending on your UI needs
         ],
       ),
     );
   }
+
+
+
+// This is a dummy function to mimic charge checking logic
+
+
   Widget _buildCustomTable(String selectedParcours, String selectedSemestre, int numberOfGroups) {
-     _valider((fn) { }, selectedParcours, selectedSemestre, groupeController);
+    _valider((fn) { }, selectedParcours, selectedSemestre, groupeController);
     List<Widget> rows = [
       Divider(),
       _buildCoursesHeader(),
@@ -1336,9 +1716,9 @@ class _AdjointRep extends State<AdjointRep> {
     rows.add(Divider(thickness: 2, color: Colors.black));
 
     // Adding all TPs
-     for (int i = 1; i <= numberOfGroups; i++) {
-     rows.add(_buildGroupRowTP('TP', i));
-     }
+    for (int i = 1; i <= numberOfGroups; i++) {
+      rows.add(_buildGroupRowTP('TP', i));
+    }
 
     return SingleChildScrollView(
       child: Column(
@@ -1426,21 +1806,21 @@ class _AdjointRep extends State<AdjointRep> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
             ),
             ...List.generate(courses.length, (index) => Expanded(
-                  child: TextField(
-                    controller: groupControllersTD[number - 1][index],
-                    style: TextStyle(fontSize: 10),
-                    decoration: InputDecoration(
-                      hintText: '',
-                      hintStyle: TextStyle(fontSize: 10),
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8.0),
-                      constraints: BoxConstraints(
-                        maxHeight:
-                        30, // Hauteur maximale du TextField réduite
-                      ),
-                    ),
+              child: TextField(
+                controller: groupControllersTD[number - 1][index],
+                style: TextStyle(fontSize: 10),
+                decoration: InputDecoration(
+                  hintText: '',
+                  hintStyle: TextStyle(fontSize: 10),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(vertical: 8.0),
+                  constraints: BoxConstraints(
+                    maxHeight:
+                    30, // Hauteur maximale du TextField réduite
                   ),
-                )),
+                ),
+              ),
+            )),
           ],
         ),
       ),
@@ -1503,7 +1883,8 @@ class _AdjointRep extends State<AdjointRep> {
           'Structure Machine 2',
           'Proba/ statistique',
           'Technologies de l\'information et communication',
-          'Option (Physique / Mécanique du Point)'
+          'Option (Physique / Mécanique du Point)',
+          'Outills de programmation pour les mathématiques'
         ];
       }
     } else if (selectedParcours == 'L2') {

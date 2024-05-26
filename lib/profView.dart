@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:untitled4/main.dart';
 import 'package:intl/intl.dart';
-
+import 'package:badges/badges.dart';
+import 'package:badges/badges.dart' as badges; // Alias for the external badges package
 class MainUserweb extends StatefulWidget {
   String iduserweb;
   MainUserweb({Key? key, required this.iduserweb}) : super(key: key);
@@ -19,6 +20,148 @@ class _MainUserweb extends State<MainUserweb> {
   String? valeur;
   String? datefin;
 
+  final TextEditingController _messageController = TextEditingController();
+  void _openChatDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[300], // Setting background color of the dialog
+          title: Container(
+            padding: const EdgeInsets.all(16.0),
+            color: Colors.blueGrey[200], // Background color for the title
+            child: Text('Chat with Adjoint', style: TextStyle(color: Colors.white)), // Optional: change text color here
+          ),
+          content: StreamBuilder(
+            stream: FirebaseFirestore.instance
+                .collection('messagesadjointprof')
+                .doc('chats')
+                .collection('adjoint${iduserweb}')
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+            builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator();
+              }
+
+              return SizedBox(
+                height: MediaQuery.of(context).size.height * 0.6,
+                width: MediaQuery.of(context).size.width * 0.4,
+                child: ListView.builder(
+                  reverse: true,
+                  itemCount: snapshot.data!.docs.length,
+                  itemBuilder: (context, index) {
+                    DocumentSnapshot document = snapshot.data!.docs[index];
+                    Map<String, dynamic> data = document.data() as Map<String, dynamic>;
+                    bool isSender = data['senderId'] == iduserweb;
+                    DateTime timestamp = (data['timestamp'] as Timestamp).toDate();
+
+                    return Align(
+                      alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (!isSender) // Only show avatar for the receiver
+                            CircleAvatar(
+                              backgroundColor: Colors.blueGrey,
+                              child: Text('A', style: TextStyle(color: Colors.white)),
+                            ),
+                          SizedBox(width: 8),
+                          Container(
+                            margin: EdgeInsets.symmetric(vertical: 2),
+                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: isSender ? Colors.grey[300] : Colors.blue,
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  data['content'],
+                                  style: TextStyle(color: isSender ? Colors.black : Colors.black),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+          actions: <Widget>[
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _messageController,
+                decoration: InputDecoration(
+                  labelText: 'Send a message',
+                  border: OutlineInputBorder(), // Adding border to the TextField
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.send),
+                    onPressed: _sendMessage,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+
+
+  void _markMessagesAsRead() {
+    if (iduserweb != null) {
+
+      FirebaseFirestore.instance
+          .collection('messagesadjointprof')
+          .doc('chats')
+          .collection('adjoint${iduserweb}')
+          .where('senderId', isEqualTo: 'adjoint')
+          .where('receiverId', isEqualTo: '${iduserweb}')
+          .where('read', isEqualTo: false)
+          .get()
+          .then((snapshot) {
+        for (var doc in snapshot.docs) {
+          doc.reference.update({'read': true});
+        }
+      });
+    }
+  }
+  void _sendMessage() {
+    if (_messageController.text.isNotEmpty) {
+      FirebaseFirestore.instance.collection('messagesadjointprof')
+          .doc('chats')
+          .collection('adjoint${iduserweb}')
+          .add({
+        'senderId': iduserweb,
+        'receiverId': 'adjoint', // You need to define the receiver ID correctly
+        'timestamp': Timestamp.now(),
+        'content': _messageController.text,
+        'read': false,
+      });
+
+      _messageController.clear();
+      _markMessagesAsRead();
+
+    }
+  }
   void initState() {
     super.initState();
     fetchProfName();
@@ -270,6 +413,40 @@ class _MainUserweb extends State<MainUserweb> {
           ],
         ),
       ),
+
+      floatingActionButton:  StreamBuilder(
+        stream: FirebaseFirestore.instance
+          .collection('messagesadjointprof')
+          .doc('chats')
+          .collection('adjoint${iduserweb}')
+            .where('senderId', isEqualTo: 'adjoint')
+            .where('receiverId', isEqualTo: '${iduserweb}')
+            .where('read', isEqualTo: false)
+            .snapshots(),
+        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+          int unreadMessages =
+          snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+          return badges.Badge(
+            badgeContent: Text(
+              unreadMessages.toString(),
+              style: TextStyle(color: Colors.white),
+            ),
+            showBadge: unreadMessages > 0,
+            position: BadgePosition.topEnd(top: 0, end: 3),
+            child: FloatingActionButton(
+
+              onPressed: () {
+                _openChatDialog();
+              },
+              child: Icon(Icons.message),
+              backgroundColor: Colors.blue,
+            ),
+
+          );
+        },
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startDocked,
       body: Container(
         margin: const EdgeInsets.all(6),
         child: Center(
@@ -961,16 +1138,7 @@ class _MainUserweb extends State<MainUserweb> {
     );
   }
   // pas utilisé
-  bool validateFields(List<ModuleState> moduleStates) {
-    bool allValid = true;
-    for (var state in moduleStates) {
-      if (state.moduleController.text.isEmpty || state.parcoursController.text.isEmpty) {
-        allValid = false;
-        break;
-      }
-    }
-    return allValid;
-  }
+
   // UTILIS2
   void saveDataToFirebase(String iduserweb) async {
       FirebaseFirestore db = FirebaseFirestore.instance;
