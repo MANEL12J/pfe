@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:untitled4/main.dart';
 import 'package:intl/intl.dart';
 import 'package:badges/badges.dart';
 import 'package:badges/badges.dart' as badges; // Alias for the external badges package
@@ -18,7 +17,7 @@ class _MainUserweb extends State<MainUserweb> {
 
   String profName = "";
   String? valeur;
-  String? datefin;
+
   String professorName = '';
   String professorFirstName = '';
   Map<String, Map<String, Map<String, List<Map<String, dynamic>>>>> repartitionData = {};
@@ -142,8 +141,6 @@ class _MainUserweb extends State<MainUserweb> {
       print('Document does not exist.');
     }
   }
-
-
   void _markMessagesAsRead() {
     if (iduserweb != null) {
 
@@ -190,7 +187,7 @@ class _MainUserweb extends State<MainUserweb> {
       setState(() => isLoading = false);
     }
   }
-  Future<void> login(String userId) async {
+  Future<void> login(String userId) async       {
     DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
     if (userDoc.exists) {
       professorName = userDoc['nom'];
@@ -225,10 +222,28 @@ class _MainUserweb extends State<MainUserweb> {
   }
   void initState() {
     super.initState();
-    fetchProfName();
-    fetchData();
+     fetchProfName();
+     fetchData();
     _loadValidite();
+
+
+
   }
+  String? datefin;
+  bool isLoading2 = true;
+  String? datedebut;
+  DateTime? datefin1;
+  DateTime? datedebut1;
+  bool isWithinDateRange() {
+    DateTime now = DateTime.now();
+
+    if (datedebut1 == null || datefin1 == null) {
+      return false;
+    }
+
+    return now.isAfter(datedebut1!) && now.isBefore(datefin1!);
+  }
+
 
   Future<dynamic> fetchProfName() async {
     DocumentSnapshot profDoc = await FirebaseFirestore.instance
@@ -259,22 +274,36 @@ class _MainUserweb extends State<MainUserweb> {
       if (querySnapshot.docs.isNotEmpty) {
         var document = querySnapshot.docs.first;
         DateTime date = document['endDate'].toDate();
+        DateTime date2 = document['startDate'].toDate();
         String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+        String formattedDate2 = DateFormat('yyyy-MM-dd').format(date2);
+        Timestamp startTimestamp = document['endDate'];
+        Timestamp endTimestamp = document['startDate'];
         setState(() {
           datefin = formattedDate;
-        }); // Formate la date en String selon le format désiré
+          datedebut = formattedDate2;
+          datedebut1 = startTimestamp.toDate();
+          datefin1 = endTimestamp.toDate();
+          isLoading2 = false;
+
+        });
+        print(datedebut1);
+        print(datefin1);// Formate la date en String selon le format désiré
       } else {
         setState(() {
           datefin = "Aucune date disponible";
+          datedebut = "Aucune date disponible";
+
         }); // Gestion quand aucun document n'est trouvé
       }
     } catch (e) {
       setState(() {
         datefin = "Erreur lors de la récupération";
+        datedebut = "Erreur lors de la récupération";
+        isLoading2 = false;
       });
     }
   }
-
   List<ModuleState> moduleStates = List.generate(3,
       (index) => ModuleState(
             moduleController: TextEditingController(),
@@ -426,10 +455,14 @@ class _MainUserweb extends State<MainUserweb> {
 
   @override
   Widget build(BuildContext context) {
-    // Obtention de l'année actuelle
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+      // Obtention de l'année actuelle
     int currentYear = DateTime.now().year;
     // Calcul de l'année prochaine
     int nextYear = currentYear + 1;
+    bool canAccessContainer = isWithinDateRange();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -530,38 +563,1266 @@ class _MainUserweb extends State<MainUserweb> {
                   var userDoc = snapshot.data;
                   String valeur = userDoc!['valide'] ; // Defaulting to 'null' if the key does not exist
                   if (valeur == 'null') {
-                    return Align(
-                      alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(
-                            8.0), // Add some padding around the text
+                    if(canAccessContainer  = true ){
+                      return Container(
+                        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.99),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            SizedBox(height: 20),
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
                             Text(
-                              'Boîte de réception',
-                              style: TextStyle(
-                                  fontSize:
-                                      22, // Slightly larger text for the title
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87),
+                              'Fiche de vœux $currentYear /$nextYear',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                            const Divider(),
-                            SizedBox(
-                                height:
-                                    10), // Space between the title and subtitle
                             Text(
-                              "Aucun message pour l'instant !",
-                              style: TextStyle(
-                                  fontSize: 18, color: Colors.grey.shade600),
+                              '(Veuiller soumettre avant $datefin)',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 15,
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: ListView(
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: Container(
+                                            margin:
+                                            const EdgeInsets.only(left: 8),
+                                            decoration: const BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                left: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                right: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                              ),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(4.0),
+                                              child: RichText(
+                                                textAlign: TextAlign.left,
+                                                text: TextSpan(
+                                                  style: const TextStyle(
+                                                      color: Colors
+                                                          .black), // Style par défaut pour tout le texte
+                                                  children: [
+                                                    const TextSpan(
+                                                      text: 'MATIÈRES ',
+                                                      style: TextStyle(
+                                                        color: Colors.black,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' À POUVOIR',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' SOUHAITÉES POUR LE',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: '  SEMESTRE 1 ',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text:
+                                                      '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text:
+                                                      '(Préciser le parcours L1, L2, L3, M1, M2)',
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )),
+                                      ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: const BoxDecoration(
+                                            border: Border(
+                                              top: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              right: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Département \n',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Card(
+                                    margin: const EdgeInsets.fromLTRB(
+                                        8.0, 0, 8.0, 8.0),
+                                    color: Colors.white,
+                                    elevation: 0.0,
+                                    child: Table(
+                                      columnWidths: const {
+                                        0: FlexColumnWidth(3.1),
+                                        1: FlexColumnWidth(1.5),
+                                        2: FlexColumnWidth(0.5),
+                                        3: FlexColumnWidth(0.5),
+                                        4: FlexColumnWidth(0.5),
+                                        5: FlexColumnWidth(2),
+                                      },
+                                      border: TableBorder.all(
+                                          color: Colors.blueGrey, width: 2),
+                                      children: [
+                                        const TableRow(children: [
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Modules',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Parcours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Cours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TD',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TP',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                        ]),
+                                        ...List.generate(moduleStates.length,
+                                                (index) {
+                                              final state = moduleStates[index];
+                                              return TableRow(children: [
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: TextField(
+                                                      controller:
+                                                      state.moduleController,
+                                                      decoration: InputDecoration(
+                                                        isDense: true,
+                                                        contentPadding:
+                                                        const EdgeInsets.all(10),
+                                                        hintText: '${index + 1}:',
+                                                        border: state.moduleController.text.isEmpty
+                                                            ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                            : OutlineInputBorder(),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    controller:
+                                                    state.parcoursController,
+                                                    decoration:  InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: state.parcoursController.text.isEmpty
+                                                          ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                          : OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state.course,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state.course = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state.td,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state.td = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state.tp,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state.tp = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ]);
+                                            }),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 10,
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: ListView(
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: Container(
+                                            margin:
+                                            const EdgeInsets.only(left: 8),
+                                            decoration: const BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                left: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                right: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                              ),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(4.0),
+                                              child: RichText(
+                                                textAlign: TextAlign.left,
+                                                text: TextSpan(
+                                                  style: const TextStyle(
+                                                      color: Colors
+                                                          .black), // Style par défaut pour tout le texte
+                                                  children: [
+                                                    const TextSpan(
+                                                      text: 'MATIÈRES ',
+                                                      style: TextStyle(
+                                                        color: Colors.black,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' À POUVOIR',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' SOUHAITÉES POUR LE',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: '  SEMESTRE 2 ',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text:
+                                                      '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text:
+                                                      '(Préciser le parcours L1, L2, L3, M1, M2)',
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )),
+                                      ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: const BoxDecoration(
+                                            border: Border(
+                                              top: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              right: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Département \n',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Card(
+                                    margin: const EdgeInsets.fromLTRB(
+                                        8.0, 0, 8.0, 8.0),
+                                    color: Colors.white,
+                                    elevation: 0.0,
+                                    child: Table(
+                                      columnWidths: const {
+                                        0: FlexColumnWidth(3.1),
+                                        1: FlexColumnWidth(1.5),
+                                        2: FlexColumnWidth(0.5),
+                                        3: FlexColumnWidth(0.5),
+                                        4: FlexColumnWidth(0.5),
+                                        5: FlexColumnWidth(2),
+                                      },
+                                      border: TableBorder.all(
+                                          color: Colors.blueGrey, width: 2),
+                                      children: [
+                                        const TableRow(children: [
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Modules',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Parcours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Cours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TD',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TP',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                        ]),
+                                        ...List.generate(moduleStates2.length,
+                                                (index) {
+                                              final state2 = moduleStates2[index];
+                                              return TableRow(children: [
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    controller:
+                                                    state2.moduleController,
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      const EdgeInsets.all(10),
+                                                      hintText: '${index + 1}:',
+                                                      border: state2.moduleController.text.isEmpty
+                                                          ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                          : OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    controller:
+                                                    state2.parcoursController,
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: state2.parcoursController.text.isEmpty
+                                                          ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                          : OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state2.course,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state2.course = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state2.td,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state2.td = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state2.tp,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state2.tp = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ]);
+                                            }),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 10,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: SizedBox(
+                                  height: 40,
+                                  width: 100,
+                                  child: MaterialButton(
+                                    onPressed: () async {
+                                      saveDataToFirebase(widget.iduserweb);
+                                    },
+                                    color: Colors.green, // Couleur du bouton
+                                    textColor: Colors.white, // Couleur du texte
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize
+                                          .min, // Pour s'assurer que le contenu interne reste compact
+                                      children: <Widget>[
+                                        Icon(Icons.check), // Icône
+                                        SizedBox(
+                                            width:
+                                            8), // Espace entre l'icône et le texte
+                                        Text('Valider'), // Texte
+                                      ],
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                            5.0) // Arrondir les coins du bouton
+                                    ),
+                                    elevation:
+                                    2.0, // Ajoute une ombre sous le bouton
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    );
+                      );
+                    }else{
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.all(
+                              8.0), // Add some padding around the text
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              SizedBox(height: 20),
+                              Text(
+                                'Boîte de réception',
+                                style: TextStyle(
+                                    fontSize:
+                                    22, // Slightly larger text for the title
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87),
+                              ),
+                              const Divider(),
+                              SizedBox(
+                                  height:
+                                  10), // Space between the title and subtitle
+                              Text(
+                                "Aucun message pour l'instant !",
+                                style: TextStyle(
+                                    fontSize: 18, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
                   }
                   else if (valeur == 'false') {
+                    if(canAccessContainer = true){
+                      return
+                        Container(
+                          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.99),
+                          child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Fiche de vœux $currentYear /$nextYear',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '(Veuiller soumettre avant $datefin)',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 15,
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: ListView(
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: Container(
+                                            margin:
+                                            const EdgeInsets.only(left: 8),
+                                            decoration: const BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                left: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                right: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                              ),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(4.0),
+                                              child: RichText(
+                                                textAlign: TextAlign.left,
+                                                text: TextSpan(
+                                                  style: const TextStyle(
+                                                      color: Colors
+                                                          .black), // Style par défaut pour tout le texte
+                                                  children: [
+                                                    const TextSpan(
+                                                      text: 'MATIÈRES ',
+                                                      style: TextStyle(
+                                                        color: Colors.black,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' À POUVOIR',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' SOUHAITÉES POUR LE',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: '  SEMESTRE 1 ',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text:
+                                                      '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text:
+                                                      '(Préciser le parcours L1, L2, L3, M1, M2)',
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )),
+                                      ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: const BoxDecoration(
+                                            border: Border(
+                                              top: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              right: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Département \n',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Card(
+                                    margin: const EdgeInsets.fromLTRB(
+                                        8.0, 0, 8.0, 8.0),
+                                    color: Colors.white,
+                                    elevation: 0.0,
+                                    child: Table(
+                                      columnWidths: const {
+                                        0: FlexColumnWidth(3.1),
+                                        1: FlexColumnWidth(1.5),
+                                        2: FlexColumnWidth(0.5),
+                                        3: FlexColumnWidth(0.5),
+                                        4: FlexColumnWidth(0.5),
+                                        5: FlexColumnWidth(2),
+                                      },
+                                      border: TableBorder.all(
+                                          color: Colors.blueGrey, width: 2),
+                                      children: [
+                                        const TableRow(children: [
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Modules',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Parcours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Cours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TD',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TP',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                        ]),
+                                        ...List.generate(moduleStates.length,
+                                                (index) {
+                                              final state = moduleStates[index];
+                                              return TableRow(children: [
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: TextField(
+                                                      controller:
+                                                      state.moduleController,
+                                                      decoration: InputDecoration(
+                                                        isDense: true,
+                                                        contentPadding:
+                                                        const EdgeInsets.all(10),
+                                                        hintText: '${index + 1}:',
+                                                        border: state.moduleController.text.isEmpty
+                                                            ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                            : OutlineInputBorder(),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    controller:
+                                                    state.parcoursController,
+                                                    decoration:  InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: state.parcoursController.text.isEmpty
+                                                          ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                          : OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state.course,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state.course = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state.td,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state.td = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state.tp,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state.tp = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ]);
+                                            }),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 5,
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: ListView(
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: Container(
+                                            margin:
+                                            const EdgeInsets.only(left: 8),
+                                            decoration: const BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                left: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                                right: BorderSide(
+                                                    color: Colors.blueGrey,
+                                                    width: 2),
+                                              ),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(4.0),
+                                              child: RichText(
+                                                textAlign: TextAlign.left,
+                                                text: TextSpan(
+                                                  style: const TextStyle(
+                                                      color: Colors
+                                                          .black), // Style par défaut pour tout le texte
+                                                  children: [
+                                                    const TextSpan(
+                                                      text: 'MATIÈRES ',
+                                                      style: TextStyle(
+                                                        color: Colors.black,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' À POUVOIR',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: ' SOUHAITÉES POUR LE',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text: '  SEMESTRE 2 ',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text:
+                                                      '$currentYear-$nextYear PAR ORDRE DE PRIORITÉ  \n',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const TextSpan(
+                                                      text:
+                                                      '(Préciser le parcours L1, L2, L3, M1, M2)',
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )),
+                                      ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: const BoxDecoration(
+                                            border: Border(
+                                              top: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                              right: BorderSide(
+                                                  color: Colors.blueGrey,
+                                                  width: 2),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Département \n',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Card(
+                                    margin: const EdgeInsets.fromLTRB(
+                                        8.0, 0, 8.0, 8.0),
+                                    color: Colors.white,
+                                    elevation: 0.0,
+                                    child: Table(
+                                      columnWidths: const {
+                                        0: FlexColumnWidth(3.1),
+                                        1: FlexColumnWidth(1.5),
+                                        2: FlexColumnWidth(0.5),
+                                        3: FlexColumnWidth(0.5),
+                                        4: FlexColumnWidth(0.5),
+                                        5: FlexColumnWidth(2),
+                                      },
+                                      border: TableBorder.all(
+                                          color: Colors.blueGrey, width: 2),
+                                      children: [
+                                        const TableRow(children: [
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Modules',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Parcours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('Cours',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TD',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('TP',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                          Padding(
+                                            padding: EdgeInsets.all(8.0),
+                                            child: Text('',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)),
+                                          ),
+                                        ]),
+                                        ...List.generate(moduleStates2.length,
+                                                (index) {
+                                              final state2 = moduleStates2[index];
+                                              return TableRow(children: [
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    controller:
+                                                    state2.moduleController,
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      const EdgeInsets.all(10),
+                                                      hintText: '${index + 1}:',
+                                                      border: state2.moduleController.text.isEmpty
+                                                          ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                          : OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    controller:
+                                                    state2.parcoursController,
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: state2.parcoursController.text.isEmpty
+                                                          ? OutlineInputBorder(borderSide: BorderSide(color: Colors.red))
+                                                          : OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state2.course,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state2.course = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state2.td,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state2.td = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  height: 30,
+                                                  child: Center(
+                                                    child: Checkbox(
+                                                      value: state2.tp,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          state2.tp = value!;
+                                                        });
+                                                      },
+                                                      activeColor: Colors.green,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(
+                                                  height: 30,
+                                                  child: TextField(
+                                                    decoration: InputDecoration(
+                                                      isDense: true,
+                                                      contentPadding:
+                                                      EdgeInsets.all(10),
+                                                      border: OutlineInputBorder(),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ]);
+                                            }),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 5,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: SizedBox(
+                                  height: 40,
+                                  width: 100,
+                                  child: MaterialButton(
+                                    onPressed: () async {
+                                      saveDataToFirebase(widget.iduserweb);
+                                    },
+                                    color: Colors.green, // Couleur du bouton
+                                    textColor: Colors.white, // Couleur du texte
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize
+                                          .min, // Pour s'assurer que le contenu interne reste compact
+                                      children: <Widget>[
+                                        Icon(Icons.check), // Icône
+                                        SizedBox(
+                                            width:
+                                            8), // Espace entre l'icône et le texte
+                                        Text('Valider'), // Texte
+                                      ],
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                            5.0) // Arrondir les coins du bouton
+                                    ),
+                                    elevation:
+                                    2.0, // Ajoute une ombre sous le bouton
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                      ),
+                        );
+                    }else{
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.all(
+                              8.0), // Add some padding around the text
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              SizedBox(height: 20),
+                              Text(
+                                'Boîte de réception',
+                                style: TextStyle(
+                                    fontSize:
+                                    22, // Slightly larger text for the title
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87),
+                              ),
+                              const Divider(),
+                              SizedBox(
+                                  height:
+                                  10), // Space between the title and subtitle
+                              Text(
+                                "Aucun message pour l'instant !",
+                                style: TextStyle(
+                                    fontSize: 18, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
                     return Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1172,7 +2433,7 @@ class _MainUserweb extends State<MainUserweb> {
                        ],
                      );
                   }
-                  else if (valeur == 'true') {
+                  else if (valeur == 'true' ) {
                     return Align(
                       alignment: Alignment.topLeft,
                       child: Padding(

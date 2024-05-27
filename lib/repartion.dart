@@ -1,11 +1,9 @@
 import 'package:badges/badges.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:syncfusion_flutter_charts/charts.dart';
-
 import 'nagivateuradjoint.dart'; // Alias for the external badges package
 
 class AdjointRep extends StatefulWidget {
@@ -1782,7 +1780,7 @@ class _AdjointRep extends State<AdjointRep> {
                       Expanded(
                         flex: 2,
                         child: FutureBuilder<QuerySnapshot>(
-                          future: FirebaseFirestore.instance.collection('repartition').get(),
+                          future: FirebaseFirestore.instance.collection('repartition').where('valide' , isEqualTo: 'true').get(),
                           builder: (context, snapshot) {
                             if (snapshot.connectionState == ConnectionState.waiting) {
                               return Center(child: CircularProgressIndicator());

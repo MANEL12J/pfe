@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:untitled4/repartion.dart';
 import 'Insciption.dart';
 import 'nagivateuradjoint.dart';
 import 'chefdepartementView.dart';
@@ -111,12 +110,12 @@ class _LoginFormState extends State<LoginForm> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      if (_email == "chefdepartement@gmail.com" && _password == "chef2024") {
+      if (_email == "chefdepartement@matierelink.com" && _password == "chef2024") {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => navigation2(idnavigateur: "chef")),
         );
-      } else if (_email == "adjointdepartement@gmail.com" && _password == "adjoint2024") {
+      } else if (_email == "adjointdepartement@matierelink.com" && _password == "adjoint2024") {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => navigationadjoint(idnavigateur: "adjoint")),

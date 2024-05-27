@@ -4,7 +4,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'historiqueprof.dart';
 import 'main.dart';
 import 'profView.dart';
-import 'chefdepartementView.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class navigation extends StatefulWidget {
@@ -49,8 +48,7 @@ class _navigationState extends State<navigation> {
     switch (pos) {
       case 0:
         return MainUserweb(iduserweb: idnavigateur);
-      case 1:
-        return ProfessorHomePage( userId: idnavigateur,);
+
       default:
         return Center(child: Text('Error'));
     }

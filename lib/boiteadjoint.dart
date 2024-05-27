@@ -53,7 +53,6 @@ class _AdjointBoiteState extends State<AdjointBoite> {
       ),
     );
   }
-
   Widget usersListWidget() {
     return StreamBuilder(
       stream: _firestore.collection('users').snapshots(),
