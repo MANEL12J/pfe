@@ -22,6 +22,7 @@ class _MainUserweb extends State<MainUserweb> {
   String professorFirstName = '';
   Map<String, Map<String, Map<String, List<Map<String, dynamic>>>>> repartitionData = {};
   bool isLoading = true;
+  Color primary = const Color(0xffEFEDF5);
   final TextEditingController _messageController = TextEditingController();
   void _openChatDialog() {
     showDialog(
@@ -467,7 +468,7 @@ class _MainUserweb extends State<MainUserweb> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.black87,
+        backgroundColor: primary,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:timeline_tile/timeline_tile.dart';
 import 'package:badges/badges.dart'
     as badges; // Alias for the external badges package
+import 'histpriqueview.dart';
 import 'main.dart';
 import 'package:http/http.dart' as http;
 
@@ -1496,9 +1497,7 @@ class _navigation2 extends State<navigation2> {
       chefdepartementView(
         idchefdepartement: "chef",
       ),
-      chefdepartementView(
-        idchefdepartement: "chef",
-      )
+      RepartitionPage(),
     ];
   }
   final labelstyle = const TextStyle(fontWeight: FontWeight.bold, fontSize: 20);
@@ -1509,16 +1508,17 @@ class _navigation2 extends State<navigation2> {
       body: Row(
         children: [
           NavigationRail(
-            backgroundColor: Colors.black87,
+            backgroundColor: Colors.black26,
             selectedIconTheme:
-                const IconThemeData(color: Colors.black, size: 20),
-            unselectedIconTheme:
                 const IconThemeData(color: Colors.white, size: 20),
+            unselectedIconTheme:
+                const IconThemeData(color: Colors.black87, size: 20),
             selectedLabelTextStyle: const TextStyle(
                 color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
             unselectedLabelTextStyle:
-                const TextStyle(color: Colors.grey, fontSize: 12),
+                const TextStyle(color: Colors.black87, fontSize: 12),
             labelType: NavigationRailLabelType.all,
+
             onDestinationSelected: (int i) {
               setState(() {
                 selectedindex = i;
@@ -1540,10 +1540,10 @@ class _navigation2 extends State<navigation2> {
                   height: 8,
                 ),
                 Image.asset(
-                  "assets/logoozaki-removebg-preview.png",
-                  width: 90,
-                  height: 90,
-                  fit: BoxFit.fill,
+                  "photo_2024-05-28_17-10-33-removebg-preview.png",
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.cover,
                 ),
                 const SizedBox(
                   height: 40,
@@ -1553,7 +1553,7 @@ class _navigation2 extends State<navigation2> {
             trailing: Column(
               children: [
                 SizedBox(
-                  height: 150,
+                  height: 170,
                 ),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -1583,6 +1583,7 @@ class _navigation2 extends State<navigation2> {
             ),
           ),
           Expanded(
+            flex: 3,
               child: Container(color: Colors.white, child: scr[selectedindex])),
         ],
       ),

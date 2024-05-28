@@ -455,12 +455,6 @@ class _AdjointRep extends State<AdjointRep> {
     return courses[parcours]?[semestre] ?? [];
   }
 
-
-
-
-
-
-
   Future<void> _saveDataToFirebase() async {
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     final int anneeActuelle = DateTime.now().year;
@@ -565,7 +559,6 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
   void showOverloadAlert(String message) {
     // Use your framework's alert/dialog mechanism here, e.g., for Flutter:
     ScaffoldMessenger.of(context).showSnackBar(

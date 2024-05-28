@@ -92,8 +92,8 @@ class _navigationState extends State<navigation> {
   Widget build(BuildContext context) {
     var drawer = Container(
       width: MediaQuery.of(context).size.width *
-          0.14, // Adjust the width as needed
-      color: Colors.black87,
+          0.16, // Adjust the width as needed
+      color: Colors.black26,
       child: Column(
         children: <Widget>[
           Expanded(
@@ -101,8 +101,8 @@ class _navigationState extends State<navigation> {
               padding: EdgeInsets.only(left: 8),
               children: <Widget>[
                 DrawerHeader(
-                  child: Image.asset("assets/logoozaki-removebg-preview.png",
-                      width: 70, height: 70, fit: BoxFit.contain),
+                  child: Image.asset("photo_2024-05-28_17-10-33-removebg-preview.png",
+                      width:  200, height: 100, fit: BoxFit.cover),
                 ),
                 _buildDrawerItem(
                   title: 'Boite de réception',
