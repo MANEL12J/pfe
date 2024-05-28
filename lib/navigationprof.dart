@@ -110,12 +110,7 @@ class _navigationState extends State<navigation> {
                   isSelected: selectedindex == 0,
                   onTap: () => _onSelectItem(0),
                 ),
-                _buildDrawerItem(
-                  title: 'Historique',
-                  icon: Icons.history,
-                  isSelected: selectedindex == 1,
-                  onTap: () => _onSelectItem(1),
-                ),
+
               ],
             ),
           ),

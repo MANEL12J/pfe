@@ -468,6 +468,7 @@ class _MainUserweb extends State<MainUserweb> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: primary,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -476,7 +477,7 @@ class _MainUserweb extends State<MainUserweb> {
               profName.toLowerCase(),
               style: TextStyle(
                   fontSize: 17,
-                  color: Colors.white,
+                  color: Colors.black87,
                   fontWeight: FontWeight.bold),
             ),
             StreamBuilder<DocumentSnapshot>(
