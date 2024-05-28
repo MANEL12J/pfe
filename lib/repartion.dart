@@ -228,6 +228,25 @@ class _AdjointRep extends State<AdjointRep> {
       }
     }
 
+
+    Map<String, int> calculateProfOverloads() {
+      Map<String, int> profCounts = {};
+      repartitionData.forEach((parcours, semestres) {
+        semestres.forEach((semestre, modules) {
+          modules.forEach((module, types) {
+            types.forEach((type, profs) {
+              profs.split(', ').forEach((prof) {
+                if (prof != 'N/A') {
+                  profCounts[prof] = (profCounts[prof] ?? 0) + 1;
+                }
+              });
+            });
+          });
+        });
+      });
+      return profCounts;
+    }
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -241,19 +260,48 @@ class _AdjointRep extends State<AdjointRep> {
                 height: 48,
                 child: MaterialButton(
                   onPressed: () async {
-                    final int currentYear = DateTime.now().year;
-                    await firestore.collection('repartition').doc(currentYear.toString()).set({
-                      'valide': 'en attente',
-                    }, SetOptions(merge: true));
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => navigationadjoint(idnavigateur: "adjoint")),
-                    ); // Fermer la boîte de dialogue
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Répartition envoyée au chef de département')),
-                    );
-                    // Ajoutez ici le code pour envoyer les données au chef de département
-                    print("Envoyer au chef de département");
+                    await fetchData();
+                    Map<String, int> profOverloads = calculateProfOverloads();
+                    bool overloadExists = profOverloads.values.any((count) => count > 8);
+
+                    if (overloadExists) {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: Text("Surcharge détectée"),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: profOverloads.entries
+                                  .where((entry) => entry.value > 8)
+                                  .map((entry) => Text("${entry.key}: ${entry.value}"))
+                                  .toList(),
+                            ),
+                            actions: <Widget>[
+                              TextButton(
+                                child: Text("OK"),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    } else {
+                      final int currentYear = DateTime.now().year;
+                      await firestore.collection('repartition').doc(currentYear.toString()).set({
+                        'valide': 'en attente',
+                      }, SetOptions(merge: true));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => navigationadjoint(idnavigateur: "adjoint")),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Répartition envoyée au chef de département')),
+                      );
+                      Navigator.of(context).pop();
+                    }
                   },
                   color: Colors.blue,
                   textColor: Colors.white,
@@ -508,6 +556,14 @@ class _AdjointRep extends State<AdjointRep> {
         }
       }
     }
+    // Show a SnackBar indicating successful save
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sauvegarde réussie pour le semestre $selectedSemestre!'),
+        duration: Duration(seconds: 10),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   void showOverloadAlert(String message) {
@@ -1576,7 +1632,7 @@ class _AdjointRep extends State<AdjointRep> {
                       height: commonHeight,
                       child: ElevatedButton(
                         onPressed: () async {
-                          attemptSaveData(context);
+                          _saveDataToFirebase();
                         },
                         style: ElevatedButton.styleFrom(
                           primary: Colors.blue,
@@ -1931,7 +1987,6 @@ class _AdjointRep extends State<AdjointRep> {
       ),
     );
   }
-
   Widget _buildCustomTable(String selectedParcours, String selectedSemestre, int numberOfGroups) {
     _valider((fn) { }, selectedParcours, selectedSemestre, groupeController);
     List<Widget> rows = [
